@@ -191,6 +191,12 @@ const Solutions: React.FC<SolutionsProps> = ({
   const [spaceComplexityData, setSpaceComplexityData] = useState<string | null>(
     null
   )
+  
+  // Add state for brute force solution data
+  const [bruteForceCode, setBruteForceCode] = useState<string | null>(null)
+  const [bruteForceTimeComplexity, setBruteForceTimeComplexity] = useState<string | null>(null)
+  const [bruteForceSpaceComplexity, setBruteForceSpaceComplexity] = useState<string | null>(null)
+  const [isDetailedSolution, setIsDetailedSolution] = useState<boolean>(false)
 
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
   const [tooltipHeight, setTooltipHeight] = useState(0)
@@ -299,6 +305,12 @@ const Solutions: React.FC<SolutionsProps> = ({
         setThoughtsData(null)
         setTimeComplexityData(null)
         setSpaceComplexityData(null)
+        
+        // Reset detailed solution states too
+        setIsDetailedSolution(false)
+        setBruteForceCode(null)
+        setBruteForceTimeComplexity(null)
+        setBruteForceSpaceComplexity(null)
       }),
       window.electronAPI.onProblemExtracted((data) => {
         queryClient.setQueryData(["problem_statement"], data)
@@ -328,19 +340,51 @@ const Solutions: React.FC<SolutionsProps> = ({
           console.warn("Received empty or invalid solution data")
           return
         }
-        console.log({ data })
-        const solutionData = {
-          code: data.code,
-          thoughts: data.thoughts,
-          time_complexity: data.time_complexity,
-          space_complexity: data.space_complexity
-        }
+        console.log("Solution success:", data)
 
-        queryClient.setQueryData(["solution"], solutionData)
-        setSolutionData(solutionData.code || null)
-        setThoughtsData(solutionData.thoughts || null)
-        setTimeComplexityData(solutionData.time_complexity || null)
-        setSpaceComplexityData(solutionData.space_complexity || null)
+        // Check if we received the new detailed solution format (with brute force & optimized)
+        if ('bruteForceCode' in data && 'optimizedCode' in data) {
+          // Using new detailed solution format
+          setIsDetailedSolution(true)
+          
+          // Store brute force data
+          setBruteForceCode(data.bruteForceCode || null)
+          setBruteForceTimeComplexity(data.bruteForceTimeComplexity || null)
+          setBruteForceSpaceComplexity(data.bruteForceSpaceComplexity || null)
+          
+          // Using optimized solution as the main solution
+          const detailedSolution = {
+            code: data.optimizedCode,
+            thoughts: data.optimizationAnalysis || [],
+            time_complexity: data.optimizedTimeComplexity,
+            space_complexity: data.optimizedSpaceComplexity
+          }
+
+          queryClient.setQueryData(["solution"], detailedSolution)
+          setSolutionData(detailedSolution.code || null)
+          setThoughtsData(detailedSolution.thoughts || null)
+          setTimeComplexityData(detailedSolution.time_complexity || null)
+          setSpaceComplexityData(detailedSolution.space_complexity || null)
+        } else {
+          // Using the older basic solution format
+          setIsDetailedSolution(false)
+          setBruteForceCode(null)
+          setBruteForceTimeComplexity(null)
+          setBruteForceSpaceComplexity(null)
+          
+          const solutionData = {
+            code: data.code,
+            thoughts: data.thoughts,
+            time_complexity: data.time_complexity,
+            space_complexity: data.space_complexity
+          }
+
+          queryClient.setQueryData(["solution"], solutionData)
+          setSolutionData(solutionData.code || null)
+          setThoughtsData(solutionData.thoughts || null)
+          setTimeComplexityData(solutionData.time_complexity || null)
+          setSpaceComplexityData(solutionData.space_complexity || null)
+        }
 
         // Fetch latest screenshots when solution is successful
         const fetchScreenshots = async () => {
@@ -544,9 +588,26 @@ const Solutions: React.FC<SolutionsProps> = ({
                       }
                       isLoading={!thoughtsData}
                     />
+                    
+                    {isDetailedSolution && bruteForceCode && (
+                      <>
+                        <SolutionSection
+                          title="Brute Force Solution"
+                          content={bruteForceCode}
+                          isLoading={!bruteForceCode}
+                          currentLanguage={currentLanguage}
+                        />
+                        
+                        <ComplexitySection
+                          timeComplexity={bruteForceTimeComplexity}
+                          spaceComplexity={bruteForceSpaceComplexity}
+                          isLoading={!bruteForceTimeComplexity || !bruteForceSpaceComplexity}
+                        />
+                      </>
+                    )}
 
                     <SolutionSection
-                      title="Solution"
+                      title={isDetailedSolution ? "Optimized Solution" : "Solution"}
                       content={solutionData}
                       isLoading={!solutionData}
                       currentLanguage={currentLanguage}
