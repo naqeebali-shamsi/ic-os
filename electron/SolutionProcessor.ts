@@ -8,6 +8,7 @@
 import { aiService } from './AIService';
 import { responseParser, DetailedSolutionData, BasicSolutionData } from './ResponseParser';
 import { BrowserWindow } from 'electron';
+import { getBruteForcePrompt, getOptimizedPrompt, getFallbackPrompt } from '../prompts';
 
 export class SolutionProcessor {
   /**
@@ -70,11 +71,16 @@ export class SolutionProcessor {
         bruteForceTimeComplexity: bruteForceResult.timeComplexity,
         bruteForceSpaceComplexity: bruteForceResult.spaceComplexity,
         bruteForceComplexityRationale: bruteForceResult.complexityRationale,
+        bruteForceDryRunVisualization: bruteForceResult.dryRunVisualization,
         optimizationAnalysis: optimizedResult.optimizationAnalysis,
         optimizedCode: optimizedResult.code,
         optimizedTimeComplexity: optimizedResult.timeComplexity,
         optimizedSpaceComplexity: optimizedResult.spaceComplexity,
-        optimizedComplexityRationale: optimizedResult.complexityRationale
+        optimizedComplexityRationale: optimizedResult.complexityRationale,
+        optimizedDryRunVisualization: optimizedResult.dryRunVisualization,
+        // Include raw responses for direct display
+        rawBruteForceResponse: bruteForceResponse,
+        rawOptimizedResponse: optimizedResponse
       };
       
       return { success: true, data: combinedResult };
@@ -103,40 +109,7 @@ export class SolutionProcessor {
     language: string,
     signal: AbortSignal
   ): Promise<string> {
-    const promptText = `
-I need you to create a straightforward brute force solution for this coding problem:
-
-PROBLEM STATEMENT:
-${problemInfo.problem_statement}
-
-CONSTRAINTS:
-${problemInfo.constraints || "No specific constraints provided."}
-
-EXAMPLE INPUT:
-${problemInfo.example_input || "No example input provided."}
-
-EXAMPLE OUTPUT:
-${problemInfo.example_output || "No example output provided."}
-
-LANGUAGE: ${language}
-
-Please provide:
-1. A simple, non-optimized, but CORRECT brute force solution in ${language}.
-2. Time complexity analysis with explanation.
-3. Space complexity analysis with explanation.
-
-Don't try to optimize this solution yet - I just need a clear, straightforward approach that solves the problem correctly, even if inefficiently.
-
-Format your response with these headers:
-- Brute Force Solution (with code block)
-- Time complexity
-- Space complexity
-
-Make sure your time and space complexity analysis include explanations.
-`;
-
-    const systemPrompt = "You are an expert coding interview assistant. Your task is to create a correct but straightforward brute force solution for a coding problem.";
-    
+    const { promptText, systemPrompt } = getBruteForcePrompt(language, problemInfo);
     return await aiService.generateCompletion(promptText, systemPrompt, undefined, signal);
   }
 
@@ -151,33 +124,13 @@ Make sure your time and space complexity analysis include explanations.
     bruteForceSpaceComplexity: string,
     signal: AbortSignal
   ): Promise<string> {
-    const promptText = `
-Now I'd like you to optimize the brute force solution for this problem:
-
-PROBLEM STATEMENT:
-${problemInfo.problem_statement}
-
-BRUTE FORCE SOLUTION:
-\`\`\`${language}
-${bruteForceCode}
-\`\`\`
-
-BRUTE FORCE TIME COMPLEXITY: ${bruteForceTimeComplexity}
-BRUTE FORCE SPACE COMPLEXITY: ${bruteForceSpaceComplexity}
-
-Please create an optimized solution with the following sections:
-
-1. Optimization Analysis: Explain specifically what inefficiencies exist in the brute force solution and how you'll improve them.
-
-2. Optimized Code: Provide a complete, optimized solution in ${language}.
-
-3. Complexity Analysis: Detail the time and space complexity of your optimized solution with thorough explanations of why they are better (if they are).
-
-Format your response with clear headers for each section: "Optimization Analysis", "Optimized Code", "Time Complexity", and "Space Complexity".
-`;
-
-    const systemPrompt = "You are an expert coding interview assistant. Your task is to analyze a brute force solution and create an optimized version with clear explanations.";
-    
+    const { promptText, systemPrompt } = getOptimizedPrompt(
+      language, 
+      problemInfo, 
+      bruteForceCode, 
+      bruteForceTimeComplexity, 
+      bruteForceSpaceComplexity
+    );
     return await aiService.generateCompletion(promptText, systemPrompt, undefined, signal);
   }
 
@@ -190,35 +143,7 @@ Format your response with clear headers for each section: "Optimization Analysis
     signal: AbortSignal
   ): Promise<{ success: boolean, data?: BasicSolutionData, error?: string }> {
     try {
-      const promptText = `
-Generate a detailed solution for the following coding problem:
-
-PROBLEM STATEMENT:
-${problemInfo.problem_statement}
-
-CONSTRAINTS:
-${problemInfo.constraints || "No specific constraints provided."}
-
-EXAMPLE INPUT:
-${problemInfo.example_input || "No example input provided."}
-
-EXAMPLE OUTPUT:
-${problemInfo.example_output || "No example output provided."}
-
-LANGUAGE: ${language}
-
-I need the response in the following format:
-1. Code: A clean, optimized implementation in ${language}
-2. Your Thoughts: A list of key insights and reasoning behind your approach
-3. Time complexity: O(X) with a detailed explanation (at least 2 sentences)
-4. Space complexity: O(X) with a detailed explanation (at least 2 sentences)
-
-For complexity explanations, please be thorough. For example: "Time complexity: O(n) because we iterate through the array only once. This is optimal as we need to examine each element at least once to find the solution."
-
-Your solution should be efficient, well-commented, and handle edge cases.
-`;
-
-      const systemPrompt = "You are an expert coding interview assistant. Provide clear, optimal solutions with detailed explanations.";
+      const { promptText, systemPrompt } = getFallbackPrompt(language, problemInfo);
       
       const responseContent = await aiService.generateCompletion(promptText, systemPrompt, undefined, signal);
       const parsedResponse = responseParser.parseStandardSolutionResponse(responseContent);

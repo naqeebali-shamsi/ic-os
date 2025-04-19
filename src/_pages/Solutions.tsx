@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { dracula } from "react-syntax-highlighter/dist/esm/styles/prism"
+import ReactMarkdown from 'react-markdown'
 
 import ScreenshotQueue from "../components/Queue/ScreenshotQueue"
 
@@ -104,13 +105,15 @@ const SolutionSection = ({
 }
 
 export const ComplexitySection = ({
+  title = "Complexity",
   timeComplexity,
   spaceComplexity,
   isLoading
 }: {
-  timeComplexity: string | null
-  spaceComplexity: string | null
-  isLoading: boolean
+  title?: string;
+  timeComplexity: string | null;
+  spaceComplexity: string | null;
+  isLoading: boolean;
 }) => {
   // Helper to ensure we have proper complexity values
   const formatComplexity = (complexity: string | null): string => {
@@ -135,7 +138,7 @@ export const ComplexitySection = ({
   return (
     <div className="space-y-2">
       <h2 className="text-[13px] font-medium text-white tracking-wide">
-        Complexity
+        {title}
       </h2>
       {isLoading ? (
         <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
@@ -163,6 +166,103 @@ export const ComplexitySection = ({
       )}
     </div>
   );
+}
+
+// New DryRunSection component
+export const DryRunSection = ({
+  title = "Dry Run & Visualization",
+  dryRunVisualization,
+  isLoading
+}: {
+  title?: string;
+  dryRunVisualization: string | null | undefined;
+  isLoading: boolean;
+}) => {
+  // Debug logging
+  console.log("DryRunSection rendering with:", { title, dryRunVisualization, isLoading });
+
+  return (
+    <div className="space-y-2">
+      <h2 className="text-[13px] font-medium text-white tracking-wide">
+        {title}
+      </h2>
+      {isLoading ? (
+        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+          Generating visualization...
+        </p>
+      ) : dryRunVisualization ? (
+        <div className="text-[13px] leading-[1.4] text-gray-100 bg-white/5 rounded-md p-3 prose prose-sm prose-invert max-w-none">
+          {/* Use ReactMarkdown to render the content */}
+          <ReactMarkdown>{dryRunVisualization}</ReactMarkdown>
+        </div>
+      ) : (
+        <div className="text-[13px] leading-[1.4] text-gray-300 bg-white/5 rounded-md p-3">
+          No visualization available
+        </div>
+      )}
+    </div>
+  )
+}
+
+// New RawResponseSection component to display markdown
+export const RawResponseSection = ({
+  title,
+  content,
+  isLoading
+}: {
+  title: string;
+  content: string | null | undefined;
+  isLoading: boolean;
+}) => {
+  console.log("RawResponseSection rendering with:", { title, content: content?.substring(0, 100) });
+  
+  return (
+    <div className="space-y-2">
+      <h2 className="text-[13px] font-medium text-white tracking-wide">
+        {title}
+      </h2>
+      {isLoading ? (
+        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+          Loading response...
+        </p>
+      ) : content ? (
+        <div className="text-[13px] leading-[1.4] text-gray-100 bg-white/5 rounded-md p-3 whitespace-pre-wrap">
+          <ReactMarkdown>{content}</ReactMarkdown>
+        </div>
+      ) : (
+        <div className="text-[13px] leading-[1.4] text-gray-300 bg-white/5 rounded-md p-3">
+          No response available
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Helper function to extract the dry run section from raw markdown
+const extractDryRunSectionFromMarkdown = (markdown: string): string => {
+  // Try to extract the section between "Dry Run & Visualization" (or similar) and the next heading
+  const dryRunPatterns = [
+    /Dry Run & Visualization:?([\s\S]*?)(?:##|\n#|\nTime Complexity|\nSpace Complexity|$)/i,
+    /Dry Run:?([\s\S]*?)(?:##|\n#|\nTime Complexity|\nSpace Complexity|$)/i,
+    /Visualization:?([\s\S]*?)(?:##|\n#|\nTime Complexity|\nSpace Complexity|$)/i,
+    /Trace:?([\s\S]*?)(?:##|\n#|\nTime Complexity|\nSpace Complexity|$)/i,
+    /Walk-through:?([\s\S]*?)(?:##|\n#|\nTime Complexity|\nSpace Complexity|$)/i
+  ];
+  
+  console.log("Extracting dry run from raw markdown of length:", markdown.length);
+  
+  // Try each pattern
+  for (const pattern of dryRunPatterns) {
+    const match = markdown.match(pattern);
+    if (match && match[1]) {
+      console.log("Found dry run section with pattern:", pattern);
+      return match[1].trim();
+    }
+  }
+  
+  console.log("No specific dry run section found, returning a portion of the full response");
+  // If no dry run section is found, return a portion of the full markdown
+  return "```\n" + markdown.substring(0, 2000) + "\n... (truncated)\n```";
 }
 
 export interface SolutionsProps {
@@ -197,6 +297,13 @@ const Solutions: React.FC<SolutionsProps> = ({
   const [bruteForceTimeComplexity, setBruteForceTimeComplexity] = useState<string | null>(null)
   const [bruteForceSpaceComplexity, setBruteForceSpaceComplexity] = useState<string | null>(null)
   const [isDetailedSolution, setIsDetailedSolution] = useState<boolean>(false)
+
+  // Add state for dry run visualizations
+  const [bruteForceDryRun, setBruteForceDryRun] = useState<string | null>(null)
+  const [optimizedDryRun, setOptimizedDryRun] = useState<string | null>(null)
+  // Add state for raw responses
+  const [rawBruteForceResponse, setRawBruteForceResponse] = useState<string | null>(null)
+  const [rawOptimizedResponse, setRawOptimizedResponse] = useState<string | null>(null)
 
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
   const [tooltipHeight, setTooltipHeight] = useState(0)
@@ -311,6 +418,8 @@ const Solutions: React.FC<SolutionsProps> = ({
         setBruteForceCode(null)
         setBruteForceTimeComplexity(null)
         setBruteForceSpaceComplexity(null)
+        setBruteForceDryRun(null)
+        setOptimizedDryRun(null)
       }),
       window.electronAPI.onProblemExtracted((data) => {
         queryClient.setQueryData(["problem_statement"], data)
@@ -341,6 +450,17 @@ const Solutions: React.FC<SolutionsProps> = ({
           return
         }
         console.log("Solution success:", data)
+        
+        // Debug logging for dry run visualizations
+        console.log("Dry run data received:", {
+          bruteForceDryRun: data.bruteForceDryRunVisualization,
+          optimizedDryRun: data.optimizedDryRunVisualization
+        })
+        
+        console.log("Raw response data:", {
+          bruteForceRaw: data.rawBruteForceResponse?.substring(0, 100),
+          optimizedRaw: data.rawOptimizedResponse?.substring(0, 100)
+        })
 
         // Check if we received the new detailed solution format (with brute force & optimized)
         if ('bruteForceCode' in data && 'optimizedCode' in data) {
@@ -351,32 +471,49 @@ const Solutions: React.FC<SolutionsProps> = ({
           setBruteForceCode(data.bruteForceCode || null)
           setBruteForceTimeComplexity(data.bruteForceTimeComplexity || null)
           setBruteForceSpaceComplexity(data.bruteForceSpaceComplexity || null)
+          setBruteForceDryRun(data.bruteForceDryRunVisualization || null)
+          setRawBruteForceResponse(data.rawBruteForceResponse || null)
+          
+          // Debug logging for brute force dry run
+          console.log("Setting brute force dry run:", data.bruteForceDryRunVisualization)
           
           // Using optimized solution as the main solution
           const detailedSolution = {
             code: data.optimizedCode,
             thoughts: data.optimizationAnalysis || [],
             time_complexity: data.optimizedTimeComplexity,
-            space_complexity: data.optimizedSpaceComplexity
+            space_complexity: data.optimizedSpaceComplexity,
+            dryRunVisualization: data.optimizedDryRunVisualization,
+            rawResponse: data.rawOptimizedResponse
           }
+          
+          // Debug logging for optimized dry run
+          console.log("Setting optimized dry run:", data.optimizedDryRunVisualization)
+          setRawOptimizedResponse(data.rawOptimizedResponse || null)
 
           queryClient.setQueryData(["solution"], detailedSolution)
           setSolutionData(detailedSolution.code || null)
           setThoughtsData(detailedSolution.thoughts || null)
           setTimeComplexityData(detailedSolution.time_complexity || null)
           setSpaceComplexityData(detailedSolution.space_complexity || null)
+          setOptimizedDryRun(detailedSolution.dryRunVisualization || null)
         } else {
           // Using the older basic solution format
           setIsDetailedSolution(false)
           setBruteForceCode(null)
           setBruteForceTimeComplexity(null)
           setBruteForceSpaceComplexity(null)
+          setBruteForceDryRun(null)
+          setRawBruteForceResponse(null)
+          setRawOptimizedResponse(null)
           
           const solutionData = {
             code: data.code,
             thoughts: data.thoughts,
             time_complexity: data.time_complexity,
-            space_complexity: data.space_complexity
+            space_complexity: data.space_complexity,
+            dryRunVisualization: data.dryRunVisualization,
+            rawResponse: data.rawResponse
           }
 
           queryClient.setQueryData(["solution"], solutionData)
@@ -384,6 +521,8 @@ const Solutions: React.FC<SolutionsProps> = ({
           setThoughtsData(solutionData.thoughts || null)
           setTimeComplexityData(solutionData.time_complexity || null)
           setSpaceComplexityData(solutionData.space_complexity || null)
+          setOptimizedDryRun(solutionData.dryRunVisualization || null)
+          setRawOptimizedResponse(solutionData.rawResponse || null)
         }
 
         // Fetch latest screenshots when solution is successful
@@ -598,7 +737,23 @@ const Solutions: React.FC<SolutionsProps> = ({
                           currentLanguage={currentLanguage}
                         />
                         
+                        <DryRunSection
+                          title="Brute Force Visualization"
+                          dryRunVisualization={bruteForceDryRun}
+                          isLoading={!bruteForceDryRun}
+                        />
+                        
+                        {/* Add raw response section as fallback */}
+                        {!bruteForceDryRun && rawBruteForceResponse && (
+                          <RawResponseSection
+                            title="Brute Force Trace (Raw)"
+                            content={extractDryRunSectionFromMarkdown(rawBruteForceResponse)}
+                            isLoading={false}
+                          />
+                        )}
+                        
                         <ComplexitySection
+                          title="Brute Force Complexity"
                           timeComplexity={bruteForceTimeComplexity}
                           spaceComplexity={bruteForceSpaceComplexity}
                           isLoading={!bruteForceTimeComplexity || !bruteForceSpaceComplexity}
@@ -612,8 +767,24 @@ const Solutions: React.FC<SolutionsProps> = ({
                       isLoading={!solutionData}
                       currentLanguage={currentLanguage}
                     />
+                    
+                    <DryRunSection
+                      title={isDetailedSolution ? "Optimized Visualization" : "Solution Visualization"}
+                      dryRunVisualization={optimizedDryRun}
+                      isLoading={!optimizedDryRun}
+                    />
+                    
+                    {/* Add raw response section as fallback */}
+                    {!optimizedDryRun && rawOptimizedResponse && (
+                      <RawResponseSection
+                        title={isDetailedSolution ? "Optimized Trace (Raw)" : "Solution Trace (Raw)"}
+                        content={extractDryRunSectionFromMarkdown(rawOptimizedResponse)}
+                        isLoading={false}
+                      />
+                    )}
 
                     <ComplexitySection
+                      title="Optimized Complexity"
                       timeComplexity={timeComplexityData}
                       spaceComplexity={spaceComplexityData}
                       isLoading={!timeComplexityData || !spaceComplexityData}

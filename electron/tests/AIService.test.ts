@@ -65,7 +65,7 @@ describe('AIService', () => {
   let aiService: AIService;
   const mockConfig = {
     apiKey: 'test-api-key',
-    apiProvider: 'openai',
+    apiProvider: 'openai' as const,
     extractionModel: 'gpt-4o',
     solutionModel: 'gpt-4o',
     debuggingModel: 'gpt-4o',

@@ -8,6 +8,7 @@ export interface BasicSolutionData {
   thoughts: string[];
   time_complexity: string;
   space_complexity: string;
+  dryRunVisualization?: string;
 }
 
 export interface DetailedSolutionData {
@@ -16,11 +17,15 @@ export interface DetailedSolutionData {
   bruteForceTimeComplexity: string;
   bruteForceSpaceComplexity: string;
   bruteForceComplexityRationale: string;
+  bruteForceDryRunVisualization?: string;
   optimizationAnalysis: string[];
   optimizedCode: string;
   optimizedTimeComplexity: string;
   optimizedSpaceComplexity: string;
   optimizedComplexityRationale: string;
+  optimizedDryRunVisualization?: string;
+  rawBruteForceResponse?: string;
+  rawOptimizedResponse?: string;
 }
 
 export class ResponseParser {
@@ -32,10 +37,30 @@ export class ResponseParser {
     timeComplexity: string;
     spaceComplexity: string;
     complexityRationale: string;
+    dryRunVisualization?: string;
   } {
     // Extract code from the response
     const codeMatch = responseContent.match(/```(?:\w+)?\s*([\s\S]*?)```/);
     const code = codeMatch ? codeMatch[1].trim() : responseContent;
+    
+    // Extract dry run & visualization
+    const dryRunPattern = /(?:Dry Run|Visualization|Dry Run & Visualization|Trace|Walk-through):([\s\S]*?)(?=\n\s*(?:Time complexity|Space complexity|$))/i;
+    let dryRunVisualization: string | undefined;
+    const dryRunMatch = responseContent.match(dryRunPattern);
+    if (dryRunMatch && dryRunMatch[1]) {
+      dryRunVisualization = dryRunMatch[1].trim();
+      console.log("Found dry run visualization in response:", dryRunVisualization.substring(0, 100) + "...");
+    } else {
+      // Try an alternative pattern approach
+      const altPattern = /(?:step by step|walkthrough|example|trace|following the execution)[\s\S]*?(?=Time complexity|Space complexity|$)/i;
+      const altMatch = responseContent.match(altPattern);
+      if (altMatch && altMatch[0]) {
+        dryRunVisualization = altMatch[0].trim();
+        console.log("Found dry run visualization using alt pattern:", dryRunVisualization.substring(0, 100) + "...");
+      } else {
+        console.log("No dry run visualization found in response");
+      }
+    }
     
     // Extract complexity information
     const timeComplexityPattern = /Time complexity:?\s*([^\n]+(?:\n[^\n]+)*?)(?=\n\s*(?:Space complexity|$))/i;
@@ -92,7 +117,8 @@ export class ResponseParser {
       code,
       timeComplexity,
       spaceComplexity,
-      complexityRationale
+      complexityRationale,
+      dryRunVisualization
     };
   }
 
@@ -105,6 +131,7 @@ export class ResponseParser {
     timeComplexity: string;
     spaceComplexity: string;
     complexityRationale: string;
+    dryRunVisualization?: string;
   } {
     // Extract code
     const codeMatch = responseContent.match(/```(?:\w+)?\s*([\s\S]*?)```/);
@@ -140,6 +167,25 @@ export class ResponseParser {
         optimizationAnalysis = lines
           .map(line => line.trim())
           .filter(Boolean);
+      }
+    }
+    
+    // Extract dry run & visualization
+    const dryRunPattern = /(?:Dry Run|Visualization|Dry Run & Visualization|Trace|Walk-through):([\s\S]*?)(?=\n\s*(?:Time complexity|Space complexity|$))/i;
+    let dryRunVisualization: string | undefined;
+    const dryRunMatch = responseContent.match(dryRunPattern);
+    if (dryRunMatch && dryRunMatch[1]) {
+      dryRunVisualization = dryRunMatch[1].trim();
+      console.log("Found optimized dry run visualization:", dryRunVisualization.substring(0, 100) + "...");
+    } else {
+      // Try an alternative pattern approach
+      const altPattern = /(?:step by step|walkthrough|example|trace|following the execution)[\s\S]*?(?=Time complexity|Space complexity|$)/i;
+      const altMatch = responseContent.match(altPattern);
+      if (altMatch && altMatch[0]) {
+        dryRunVisualization = altMatch[0].trim();
+        console.log("Found optimized dry run using alt pattern:", dryRunVisualization.substring(0, 100) + "...");
+      } else {
+        console.log("No optimized dry run visualization found in response");
       }
     }
     
@@ -199,7 +245,8 @@ export class ResponseParser {
       code,
       timeComplexity,
       spaceComplexity,
-      complexityRationale
+      complexityRationale,
+      dryRunVisualization
     };
   }
 
@@ -228,6 +275,25 @@ export class ResponseParser {
         thoughts = thoughtsMatch[1].split('\n')
           .map((line) => line.trim())
           .filter(Boolean);
+      }
+    }
+    
+    // Extract dry run & visualization
+    const dryRunPattern = /(?:Dry Run|Visualization|Dry Run & Visualization|Trace|Walk-through):([\s\S]*?)(?=\n\s*(?:Time complexity|Space complexity|$))/i;
+    let dryRunVisualization: string | undefined;
+    const dryRunMatch = responseContent.match(dryRunPattern);
+    if (dryRunMatch && dryRunMatch[1]) {
+      dryRunVisualization = dryRunMatch[1].trim();
+      console.log("Found standard dry run visualization:", dryRunVisualization.substring(0, 100) + "...");
+    } else {
+      // Try an alternative pattern approach
+      const altPattern = /(?:step by step|walkthrough|example|trace|following the execution)[\s\S]*?(?=Time complexity|Space complexity|$)/i;
+      const altMatch = responseContent.match(altPattern);
+      if (altMatch && altMatch[0]) {
+        dryRunVisualization = altMatch[0].trim();
+        console.log("Found standard dry run using alt pattern:", dryRunVisualization.substring(0, 100) + "...");
+      } else {
+        console.log("No standard dry run visualization found in response");
       }
     }
     
@@ -272,10 +338,11 @@ export class ResponseParser {
     }
     
     return {
-      code: code,
+      code,
       thoughts: thoughts.length > 0 ? thoughts : ["Solution approach based on efficiency and readability"],
       time_complexity: timeComplexity,
-      space_complexity: spaceComplexity
+      space_complexity: spaceComplexity,
+      dryRunVisualization
     };
   }
 
