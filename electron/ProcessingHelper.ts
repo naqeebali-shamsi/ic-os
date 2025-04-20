@@ -420,17 +420,56 @@ export class ProcessingHelper {
       const problemInfo = this.deps.getProblemInfo();
       const language = await this.getLanguage();
       const mainWindow = this.deps.getMainWindow();
-
+      
       if (!problemInfo) {
         throw new Error("No problem info available");
       }
 
-      // Use the SolutionProcessor to generate the multi-prompt solution
+      // New prompt definition requesting the four quadrants
+      const systemPrompt = `You are an expert programmer tasked with solving a coding problem based on extracted information. Provide a detailed response formatted strictly in JSON. Do not include markdown formatting like \`\`\`json or \`\`\`.`;
+
+      const userPrompt = `
+Problem Information:
+${JSON.stringify(problemInfo, null, 2)}
+
+Task: Analyze the problem and provide a solution in ${language}. Structure your JSON response with the following FOUR top-level keys, providing detailed, markdown-formatted content for each:
+
+1.  \`problemUnderstanding\`: Markdown content covering:
+    *   Simple problem restatement.
+    *   Key constraints/edge cases.
+    *   Assumptions made.
+    *   1-2 clarifying interview questions.
+
+2.  \`bruteForceApproach\`: Markdown content covering:
+    *   Description of the brute-force approach.
+    *   Time/Space complexity analysis (Big O).
+    *   Core pattern/bottleneck identification.
+    *   Suggestions for optimization (data structures/algorithms).
+
+3.  \`optimalSolutionPseudocode\`: Markdown content covering:
+    *   Clear, language-agnostic pseudocode.
+    *   Explanation of pseudocode logic.
+
+4.  \`optimalSolutionImplementation\`: JSON object containing:
+    *   \`code\`: String containing the complete, runnable, optimized code solution in ${language} (ensure it's well-commented).
+    *   \`timeComplexity\`: String describing the final time complexity (Big O).
+    *   \`spaceComplexity\`: String describing the final space complexity (Big O).
+    *   \`thinkingProcess\`: Markdown content describing the thought process, alternatives considered, etc.
+
+Please ensure the final output is a single, valid JSON object starting with { and ending with }. The values for the first three keys should be markdown strings, and the value for the fourth key should be a nested JSON object as specified.
+`;
+      // End of new prompt definition
+
+      // Use the existing SolutionProcessor, passing the new prompts
+      // NOTE: We assume SolutionProcessor.generateSolutions can handle these prompts or will be updated.
+      // If SolutionProcessor doesn't use these prompts directly, this edit needs adjustment.
       return await solutionProcessor.generateSolutions(
         problemInfo,
         language,
         mainWindow,
-        signal
+        signal,
+        systemPrompt, // Pass the new system prompt
+        userPrompt    // Pass the new user prompt
       );
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";

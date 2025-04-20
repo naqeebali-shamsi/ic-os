@@ -226,6 +226,13 @@ const electronAPI = {
       ipcRenderer.removeListener(PROCESSING_EVENTS.API_KEY_INVALID, subscription)
     }
   },
+  onProcessingStatus: (callback: (status: { message: string, progress: number }) => void) => {
+    const subscription = (_: any, status: { message: string, progress: number }) => callback(status);
+    ipcRenderer.on('processing-status', subscription);
+    return () => {
+      ipcRenderer.removeListener('processing-status', subscription);
+    };
+  },
   removeListener: (eventName: string, callback: (...args: any[]) => void) => {
     ipcRenderer.removeListener(eventName, callback)
   },

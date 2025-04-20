@@ -28,6 +28,19 @@ export interface DetailedSolutionData {
   rawOptimizedResponse?: string;
 }
 
+// Define the structure for the new four-quadrant response
+export interface FourQuadrantData {
+  problemUnderstanding: string;      // Markdown string
+  bruteForceApproach: string;        // Markdown string
+  optimalSolutionPseudocode: string; // Markdown string
+  optimalSolutionImplementation: {   // Nested JSON object
+    code: string;
+    timeComplexity: string;
+    spaceComplexity: string;
+    thinkingProcess: string;         // Markdown string
+  };
+}
+
 export class ResponseParser {
   /**
    * Parse a brute force solution response
@@ -380,6 +393,49 @@ export class ResponseParser {
       debug_analysis: formattedDebugContent,
       thoughts
     };
+  }
+
+  /**
+   * Parses the response assuming it's a JSON string conforming to the FourQuadrantData structure.
+   */
+  public parseFourQuadrantResponse(responseContent: string): FourQuadrantData {
+    let parsedData: any;
+    try {
+      // Attempt to directly parse the JSON string
+      // First, clean potential markdown fences ```json ... ``` if they sneak in
+      const cleanedResponse = responseContent.replace(/^\s*```json\s*|\s*```\s*$/g, '').trim();
+      parsedData = JSON.parse(cleanedResponse);
+    } catch (error) {
+      console.error("Failed to parse FourQuadrant JSON:", error);
+      console.error("Raw response causing parse error:", responseContent.substring(0, 500)); // Log problematic response
+      // Return a default structure with error messages if parsing fails
+      return {
+        problemUnderstanding: "Error: Failed to parse Problem Understanding from AI response.",
+        bruteForceApproach: "Error: Failed to parse Brute Force Approach from AI response.",
+        optimalSolutionPseudocode: "Error: Failed to parse Optimal Pseudocode from AI response.",
+        optimalSolutionImplementation: {
+          code: "// Error: Failed to parse Optimal Implementation code.",
+          timeComplexity: "Error: Failed to parse complexity.",
+          spaceComplexity: "Error: Failed to parse complexity.",
+          thinkingProcess: "Error: Failed to parse thinking process."
+        }
+      };
+    }
+
+    // Validate the structure and provide defaults for missing fields
+    const validatedData: FourQuadrantData = {
+      problemUnderstanding: typeof parsedData.problemUnderstanding === 'string' ? parsedData.problemUnderstanding : "Missing: Problem Understanding.",
+      bruteForceApproach: typeof parsedData.bruteForceApproach === 'string' ? parsedData.bruteForceApproach : "Missing: Brute Force Approach.",
+      optimalSolutionPseudocode: typeof parsedData.optimalSolutionPseudocode === 'string' ? parsedData.optimalSolutionPseudocode : "Missing: Optimal Pseudocode.",
+      optimalSolutionImplementation: {
+        code: typeof parsedData.optimalSolutionImplementation?.code === 'string' ? parsedData.optimalSolutionImplementation.code : "// Missing: Optimal Implementation code.",
+        timeComplexity: typeof parsedData.optimalSolutionImplementation?.timeComplexity === 'string' ? parsedData.optimalSolutionImplementation.timeComplexity : "Missing: Time Complexity.",
+        spaceComplexity: typeof parsedData.optimalSolutionImplementation?.spaceComplexity === 'string' ? parsedData.optimalSolutionImplementation.spaceComplexity : "Missing: Space Complexity.",
+        thinkingProcess: typeof parsedData.optimalSolutionImplementation?.thinkingProcess === 'string' ? parsedData.optimalSolutionImplementation.thinkingProcess : "Missing: Thinking Process."
+      }
+    };
+
+    return validatedData;
   }
 }
 
