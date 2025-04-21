@@ -497,15 +497,17 @@ const Solutions: React.FC<SolutionsProps> = ({
           isLoading={isLoading}
         />
 
-        {/* Section 4: Optimal Solution Implementation & Analysis */}
+        {/* Section 4: Optimal Solution Code */}
         <QuadrantCard
-          title="4. Optimal Solution & Analysis"
-          content={solutionData?.optimalSolutionAnalysis} 
+          title="4. Optimal Solution Code"
+          content={solutionData?.optimalSolutionImplementation?.code}
           isLoading={isLoading}
+          isCode={true}
+          language={currentLanguage}
         />
       </div>
       
-       {/* Optional: Display Complexity and Thinking Process below the grid */}
+       {/* Optional: Display Complexity and Thinking Process below the main sections */}
        {!isLoading && solutionData?.optimalSolutionImplementation && (
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-700">
                  <QuadrantCard

@@ -4,32 +4,27 @@
 
 ✅ **Recent Changes:**
 
-*   Defined next goal: Implement a four-quadrant UI for displaying AI analysis.
-*   Updated AI prompts (`prompts.ts`) to request the four-quadrant structure in JSON format.
-*   Refactored `SolutionProcessor.ts` to use the new single prompt and call a new parser.
-*   Added `FourQuadrantData` type and `parseFourQuadrantResponse` function to `ResponseParser.ts`.
-*   Refactored `src/_pages/Solutions.tsx` to use `useState`, listen for `SOLUTION_SUCCESS`, and render the four quadrants using a reusable `QuadrantCard` component in a 2x2 grid.
-*   Added display for Optimal Complexity and Thinking Process below the main grid.
-*   Tested the four-quadrant UI implementation.
-*   Fixed `Solutions.tsx` layout issue by removing `flex-grow` and `min-h-0` from the main grid container.
-*   Fixed `Solutions.tsx` listener churn by removing `solutionData` from `useEffect` dependencies.
-*   Improved visual hierarchy in `Solutions.tsx` by making section titles bold and white.
-*   Enhanced AI prompt (`prompts.ts` -> `getFourQuadrantPrompt`) to request a more narrative, "thinking out loud" style explanation and potential visualizations within the `thinkingProcess` field.
-*   Further enhanced AI prompt (`prompts.ts` -> `getFourQuadrantPrompt`) to require detailed, human-like comments within the generated `code` explaining the thought process for each step.
+*   Enhanced AI prompt (`prompts.ts` -> `getFourQuadrantPrompt`) to require detailed, human-like comments within the generated `code` explaining the thought process for each step.
+*   Changed `Solutions.tsx` layout from 2x2 grid to vertical stack (`flex-col`).
 
 🧠 **Next Steps:**
 
-*   Test the enriched content generation (run a problem through the tool, check both `thinkingProcess` and code comments).
-*   Further UI/UX refinements based on testing.
+1.  Locate the core code/prompt responsible for generating the initial solution from screenshot context.
+2.  Modify this prompt to include a critical clarification step:
+    *   AI should first analyze the problem description for ambiguity.
+    *   If ambiguous, respond with clarifying questions and stated assumptions (fitting into the existing response structure where possible, e.g., in "Problem Understanding").
+    *   If clear, proceed with generating the full solution.
+3.  Test the modified clarification/solution flow using screenshots.
+4.  (Parked) Implement UI/logic for follow-up questions via a text area after initial solution generation.
 
 ❗ **Active Decisions / Context:**
 
-*   The core AI analysis flow now uses a single prompt requesting a JSON object with four main keys.
-*   The `Solutions.tsx` component relies on `useState` and IPC events for displaying data.
-*   The four-quadrant layout is functional after CSS adjustments.
-*   IPC listener management in `Solutions.tsx` is stable.
-*   Section/Card titles in `Solutions.tsx` are now styled (`font-bold`, `text-white`).
-*   AI prompt now requests richer, more human-like thinking process details and visualizations.
+*   Shifted focus to supporting verbally presented, potentially ambiguous interview problems, moving beyond well-structured sources like LeetCode.
+*   The AI's primary response to a screenshot should prioritize clarification (asking questions, stating assumptions) if the problem is unclear, *before* generating a full solution.
+*   The user interaction loop for clarification will be managed externally by the user (take screenshot, review AI response, update external notes/code, repeat with new screenshot).
+*   The `Solutions.tsx` UI will display either the clarification questions or the full solution based on the AI's response, using the vertical layout.
+*   Follow-up questions via a dedicated text area are a secondary feature, deferred for now.
+*   The core AI analysis flow uses a single prompt requesting a JSON object with four main keys (problemUnderstanding, bruteForceApproach, optimalSolutionPseudocode, optimalSolutionAnalysis).
 *   AI prompt now also requests detailed, explanatory comments within the generated code.
 
 ✅ **Completed detailed codebase exploration and updated Memory Bank.**

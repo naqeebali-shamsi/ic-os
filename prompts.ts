@@ -108,9 +108,9 @@ Task: Analyze the problem thoroughly and provide a comprehensive solution analys
 
 1.  \`problemUnderstanding\`: (Markdown String)
     *   **Problem Restatement:** Briefly rephrase the problem in your own words.
-    *   **Key Constraints & Edge Cases:** List significant constraints (input size, value ranges) and potential edge cases (empty input, duplicates, etc.).
-    *   **Assumptions:** State any assumptions you're making (e.g., valid input format).
-    *   **Clarifying Questions:** Include 1-2 pertinent questions you'd ask an interviewer (e.g., "Are the numbers guaranteed to be positive?", "What should happen if the input array is empty?").
+    *   **Key Constraints & Edge Cases:** List significant constraints (input size, value ranges) and potential edge cases (empty input, duplicates, etc.) **explicitly mentioned in the problem info.**
+    *   **Assumptions:** State any assumptions you're making **only if the problem info is truly ambiguous after considering constraints.**
+    *   **Clarifying Questions:** **CRITICAL: Analyze the provided problem info, especially constraints, very carefully.** Do NOT ask questions if the answer is already stated or can be directly inferred (e.g., regarding character sets if specified, case sensitivity if 'lowercase' is mentioned, uniqueness if 'unique' is mentioned, empty inputs if length constraints start > 0). Do NOT ask about performance requirements or time/space complexity expectations. Ask 1-2 questions **only** if essential information is genuinely missing and cannot be inferred.
 
 2.  \`bruteForceApproach\`: (Markdown String)
     *   **Description:** Describe a straightforward, brute-force algorithm.
