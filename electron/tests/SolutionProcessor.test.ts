@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { solutionProcessor } from '../SolutionProcessor';
 import { aiService } from '../AIService';
-import { responseParser, BasicSolutionData, DetailedSolutionData } from '../ResponseParser';
+import { responseParser, BasicSolutionData, DetailedSolutionData, FourQuadrantData } from '../ResponseParser';
+import { BrowserWindow } from 'electron';
 
 // Mock dependencies
 vi.mock('../AIService', () => ({
@@ -14,17 +15,22 @@ vi.mock('../ResponseParser', () => ({
   responseParser: {
     parseBruteForceResponse: vi.fn(),
     parseOptimizedResponse: vi.fn(),
-    parseStandardSolutionResponse: vi.fn()
+    parseStandardSolutionResponse: vi.fn(),
+    parseFourQuadrantResponse: vi.fn()
   }
 }));
 
 // Type guards
-function isDetailedSolution(data: BasicSolutionData | DetailedSolutionData): data is DetailedSolutionData {
-  return 'bruteForceCode' in data;
+function isDetailedSolution(data: BasicSolutionData | DetailedSolutionData | FourQuadrantData): data is DetailedSolutionData {
+  return data && typeof data === 'object' && 'bruteForceCode' in data;
 }
 
-function isBasicSolution(data: BasicSolutionData | DetailedSolutionData): data is BasicSolutionData {
-  return 'thoughts' in data;
+function isBasicSolution(data: BasicSolutionData | DetailedSolutionData | FourQuadrantData): data is BasicSolutionData {
+  return data && typeof data === 'object' && 'thoughts' in data;
+}
+
+function isFourQuadrantData(data: BasicSolutionData | DetailedSolutionData | FourQuadrantData): data is FourQuadrantData {
+  return data && typeof data === 'object' && 'problemUnderstanding' in data;
 }
 
 describe('SolutionProcessor', () => {
@@ -55,12 +61,25 @@ describe('SolutionProcessor', () => {
     dryRunVisualization: 'Optimized dry run: i=0, nums[i]=2, complement=7, numMap={}, add 2 to numMap; i=1, nums[i]=7, complement=2, found in numMap, return [0,1]'
   };
 
+  const mockFourQuadrantApiResponse = 'Four quadrant API response';
+  const mockParsedFourQuadrant: FourQuadrantData = {
+    problemUnderstanding: 'Understood the problem well.',
+    bruteForceApproach: 'Try all pairs.',
+    optimalSolutionPseudocode: 'Use a hash map.',
+    optimalSolutionImplementation: {
+      code: 'optimal code here',
+      timeComplexity: 'O(n)',
+      spaceComplexity: 'O(n)',
+      thinkingProcess: 'Store seen numbers.'
+    }
+  };
+
   const mockAbortSignal = { aborted: false } as AbortSignal;
-  const mockMainWindow = {
+  const mockMainWindow: Partial<BrowserWindow> = {
     webContents: {
       send: vi.fn()
-    }
-  } as any;
+    } as any
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -80,6 +99,9 @@ describe('SolutionProcessor', () => {
       
     vi.mocked(responseParser.parseOptimizedResponse)
       .mockReturnValue(mockParsedOptimized);
+
+    vi.mocked(responseParser.parseFourQuadrantResponse)
+      .mockReturnValue(mockParsedFourQuadrant);
   });
 
   afterEach(() => {
@@ -90,7 +112,7 @@ describe('SolutionProcessor', () => {
     const result = await solutionProcessor.generateSolutions(
       mockProblemInfo,
       'javascript',
-      mockMainWindow,
+      mockMainWindow as BrowserWindow,
       mockAbortSignal
     );
 
@@ -131,8 +153,50 @@ describe('SolutionProcessor', () => {
     }
   });
 
+  it('should generate a complete four-quadrant solution', async () => {
+    const result = await solutionProcessor.generateSolutions(
+      mockProblemInfo,
+      'javascript',
+      mockMainWindow as BrowserWindow,
+      mockAbortSignal
+    );
+
+    // Debug logging
+    console.log("SolutionProcessor.generateSolutions result:", result.data);
+
+    // Verify success
+    expect(result.success).toBe(true);
+
+    // Verify API calls
+    expect(aiService.generateCompletion).toHaveBeenCalledTimes(1);
+    expect(responseParser.parseFourQuadrantResponse).toHaveBeenCalledWith(mockFourQuadrantApiResponse);
+
+    // Check the data structure
+    const data = result.data;
+    expect(data).toBeDefined();
+
+    // Use the NEW type guard
+    if (data && isFourQuadrantData(data)) {
+      console.log("Four Quadrant Data:", data);
+
+      // Assertions for FourQuadrantData
+      expect(data.problemUnderstanding).toBe(mockParsedFourQuadrant.problemUnderstanding);
+      expect(data.bruteForceApproach).toBe(mockParsedFourQuadrant.bruteForceApproach);
+      expect(data.optimalSolutionPseudocode).toBe(mockParsedFourQuadrant.optimalSolutionPseudocode);
+      expect(data.optimalSolutionImplementation.code).toBe(mockParsedFourQuadrant.optimalSolutionImplementation.code);
+      expect(data.optimalSolutionImplementation.timeComplexity).toBe(mockParsedFourQuadrant.optimalSolutionImplementation.timeComplexity);
+      expect(data.optimalSolutionImplementation.spaceComplexity).toBe(mockParsedFourQuadrant.optimalSolutionImplementation.spaceComplexity);
+      expect(data.optimalSolutionImplementation.thinkingProcess).toBe(mockParsedFourQuadrant.optimalSolutionImplementation.thinkingProcess);
+    } else {
+      // Fail the test if the data structure is not FourQuadrantData
+      console.error("Expected FourQuadrantData, but received:", data);
+      expect(data).toBeDefined();
+      expect(isFourQuadrantData(data)).toBe(true);
+    }
+  });
+
   it('should fallback to standard solution if multi-prompt approach fails', async () => {
-    // Set up mocks to simulate failure in first approach
+    // Set up mocks to simulate failure in the four-quadrant approach
     vi.mocked(aiService.generateCompletion)
       .mockRejectedValueOnce(new Error('API Error'))
       .mockResolvedValueOnce('Standard solution response');
@@ -150,7 +214,7 @@ describe('SolutionProcessor', () => {
     const result = await solutionProcessor.generateSolutions(
       mockProblemInfo,
       'javascript',
-      mockMainWindow,
+      mockMainWindow as BrowserWindow,
       mockAbortSignal
     );
     
@@ -178,7 +242,9 @@ describe('SolutionProcessor', () => {
       expect(data).toHaveProperty('dryRunVisualization', mockStandardResponse.dryRunVisualization);
     } else {
       // Fail the test if the data structure is not as expected
-      expect(data).toBeUndefined(); // Or assert the structure should be BasicSolutionData
+      console.error("Expected BasicSolutionData after fallback, but received:", data);
+      expect(data).toBeDefined();
+      expect(isBasicSolution(data)).toBe(true);
     }
   });
 }); 

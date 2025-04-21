@@ -348,4 +348,38 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
       return { success: false, error: "Failed to delete last screenshot" }
     }
   })
+
+  // NEW: Follow-up question handler
+  ipcMain.handle("process-follow-up-question", async (event, context: { previousResponse: string | null, question: string, language: string }) => {
+    console.log("Received process-follow-up-question:", context);
+    if (!deps.processingHelper) {
+      console.error("ProcessingHelper is not initialized.");
+      return { error: "Processing engine not ready." };
+    }
+    
+    // Check for API key before processing
+    if (!configHelper.hasApiKey()) {
+      const mainWindow = deps.getMainWindow();
+      if (mainWindow) {
+        mainWindow.webContents.send(deps.PROCESSING_EVENTS.API_KEY_INVALID);
+      }
+      return { error: "API key required" };
+    }
+
+    try {
+      // TODO: Implement the actual follow-up logic in ProcessingHelper
+      // const result = await deps.processingHelper.handleFollowUpQuestion(context);
+      // return result;
+      
+      // Placeholder implementation
+      console.warn("Follow-up question handling not fully implemented yet in main process.");
+      // Simulate a delay and return a dummy response for now
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
+      return { answer: `This is a placeholder answer to your question: "${context.question}". Full implementation pending.` };
+      
+    } catch (error: any) {
+      console.error("Error processing follow-up question:", error);
+      return { error: error.message || "Failed to process follow-up question" };
+    }
+  });
 }

@@ -21,12 +21,12 @@
 
 ## 🚧 What's Being Worked On
 
-*   Adapting AI core logic for handling ambiguous/verbally presented problems.
-*   Locating and modifying the core prompt for initial solution generation to include a clarification step.
+*   Implement UI/logic for follow-up questions via a text area after initial solution generation.
 
 ## 📝 What's Left / Backlog
 
+*   Locate the core code/prompt responsible for generating the initial solution from screenshot context.
+*   Modify this prompt to include a critical clarification step (analyze ambiguity, ask questions/state assumptions if needed).
 *   Test the new clarification-first AI response flow.
 *   General UI/UX Improvements for Solutions view.
-*   (Parked) Implement follow-up question text area.
 *   Define subsequent development tasks/goals (via Planner Mode). 

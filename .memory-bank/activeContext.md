@@ -9,13 +9,13 @@
 
 🧠 **Next Steps:**
 
-1.  Locate the core code/prompt responsible for generating the initial solution from screenshot context.
-2.  Modify this prompt to include a critical clarification step:
+1.  Implement UI/logic for follow-up questions via a text area after initial solution generation.
+2.  Locate the core code/prompt responsible for generating the initial solution from screenshot context.
+3.  Modify this prompt to include a critical clarification step:
     *   AI should first analyze the problem description for ambiguity.
     *   If ambiguous, respond with clarifying questions and stated assumptions (fitting into the existing response structure where possible, e.g., in "Problem Understanding").
     *   If clear, proceed with generating the full solution.
-3.  Test the modified clarification/solution flow using screenshots.
-4.  (Parked) Implement UI/logic for follow-up questions via a text area after initial solution generation.
+4.  Test the modified clarification/solution flow using screenshots.
 
 ❗ **Active Decisions / Context:**
 
@@ -23,7 +23,7 @@
 *   The AI's primary response to a screenshot should prioritize clarification (asking questions, stating assumptions) if the problem is unclear, *before* generating a full solution.
 *   The user interaction loop for clarification will be managed externally by the user (take screenshot, review AI response, update external notes/code, repeat with new screenshot).
 *   The `Solutions.tsx` UI will display either the clarification questions or the full solution based on the AI's response, using the vertical layout.
-*   Follow-up questions via a dedicated text area are a secondary feature, deferred for now.
+*   Follow-up questions via a dedicated text area are now the active focus.
 *   The core AI analysis flow uses a single prompt requesting a JSON object with four main keys (problemUnderstanding, bruteForceApproach, optimalSolutionPseudocode, optimalSolutionAnalysis).
 *   AI prompt now also requests detailed, explanatory comments within the generated code.
 

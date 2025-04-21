@@ -60,7 +60,7 @@ export class SolutionProcessor {
               progress: 60
             });
         }
-        return await this.generateStandardSolution(problemInfo, language, signal);
+        return await this.generateStandardSolution(problemInfo, language, signal, mainWindow);
       } catch (fallbackError) {
         console.error("Fallback solution generation error:", fallbackError);
         return { 
@@ -77,7 +77,8 @@ export class SolutionProcessor {
   private async generateStandardSolution(
     problemInfo: any, 
     language: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    mainWindow: BrowserWindow | null
   ): Promise<{ success: boolean, data?: BasicSolutionData, error?: string }> {
     try {
       const { promptText, systemPrompt } = getFallbackPrompt(language, problemInfo);

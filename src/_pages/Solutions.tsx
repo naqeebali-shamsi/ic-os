@@ -6,6 +6,8 @@ import { dracula } from "react-syntax-highlighter/dist/esm/styles/prism"
 import ReactMarkdown from 'react-markdown'
 // Import Card components from shadcn/ui
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card" 
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 
 import ScreenshotQueue from "../components/Queue/ScreenshotQueue"
 
@@ -27,17 +29,17 @@ export const ContentSection = ({
   isLoading: boolean
 }) => (
   <div className="space-y-2">
-    <h2 className="text-[13px] font-bold text-white tracking-wide">
+    <h2 className="text-[13px] font-bold text-foreground tracking-wide">
       {title}
     </h2>
     {isLoading ? (
       <div className="mt-4 flex">
-        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+        <p className="text-xs bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-clip-text text-transparent animate-pulse">
           Extracting problem statement...
         </p>
       </div>
     ) : (
-      <div className="text-[13px] leading-[1.4] text-gray-100 max-w-[600px]">
+      <div className="text-[13px] leading-[1.4] text-foreground max-w-[600px]">
         {content}
       </div>
     )}
@@ -67,13 +69,13 @@ const SolutionSection = ({
 
   return (
     <div className="space-y-2 relative">
-      <h2 className="text-[13px] font-bold text-white tracking-wide">
+      <h2 className="text-[13px] font-bold text-foreground tracking-wide">
         {title}
       </h2>
       {isLoading ? (
         <div className="space-y-1.5">
           <div className="mt-4 flex">
-            <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+            <p className="text-xs bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-clip-text text-transparent animate-pulse">
               Loading solutions...
             </p>
           </div>
@@ -82,7 +84,7 @@ const SolutionSection = ({
         <div className="w-full relative">
           <button
             onClick={copyToClipboard}
-            className="absolute top-2 right-2 text-xs text-white bg-white/10 hover:bg-white/20 rounded px-2 py-1 transition"
+            className="absolute top-2 right-2 text-xs text-foreground bg-black/10 hover:bg-black/20 rounded px-2 py-1 transition"
           >
             {copied ? "Copied!" : "Copy"}
           </button>
@@ -141,16 +143,16 @@ export const ComplexitySection = ({
   
   return (
     <div className="space-y-2">
-      <h2 className="text-[13px] font-bold text-white tracking-wide">
+      <h2 className="text-[13px] font-bold text-foreground tracking-wide">
         {title}
       </h2>
       {isLoading ? (
-        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+        <p className="text-xs bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-clip-text text-transparent animate-pulse">
           Calculating complexity...
         </p>
       ) : (
         <div className="space-y-3">
-          <div className="text-[13px] leading-[1.4] text-gray-100 bg-white/5 rounded-md p-3">
+          <div className="text-[13px] leading-[1.4] text-foreground bg-black/5 rounded-md p-3">
             <div className="flex items-start gap-2">
               <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
               <div>
@@ -158,7 +160,7 @@ export const ComplexitySection = ({
               </div>
             </div>
           </div>
-          <div className="text-[13px] leading-[1.4] text-gray-100 bg-white/5 rounded-md p-3">
+          <div className="text-[13px] leading-[1.4] text-foreground bg-black/5 rounded-md p-3">
             <div className="flex items-start gap-2">
               <div className="w-1 h-1 rounded-full bg-blue-400/80 mt-2 shrink-0" />
               <div>
@@ -187,20 +189,20 @@ export const DryRunSection = ({
 
   return (
     <div className="space-y-2">
-      <h2 className="text-[13px] font-bold text-white tracking-wide">
+      <h2 className="text-[13px] font-bold text-foreground tracking-wide">
         {title}
       </h2>
       {isLoading ? (
-        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+        <p className="text-xs bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-clip-text text-transparent animate-pulse">
           Generating visualization...
         </p>
       ) : dryRunVisualization ? (
-        <div className="text-[13px] leading-[1.4] text-gray-100 bg-white/5 rounded-md p-3 prose prose-sm prose-invert max-w-none">
+        <div className="text-[13px] leading-[1.4] text-foreground bg-black/5 rounded-md p-3 prose prose-sm prose-invert max-w-none">
           {/* Use ReactMarkdown to render the content */}
           <ReactMarkdown>{dryRunVisualization}</ReactMarkdown>
         </div>
       ) : (
-        <div className="text-[13px] leading-[1.4] text-gray-300 bg-white/5 rounded-md p-3">
+        <div className="text-[13px] leading-[1.4] text-muted-foreground bg-black/5 rounded-md p-3">
           No visualization available
         </div>
       )}
@@ -222,19 +224,19 @@ export const RawResponseSection = ({
   
   return (
     <div className="space-y-2">
-      <h2 className="text-[13px] font-bold text-white tracking-wide">
+      <h2 className="text-[13px] font-bold text-foreground tracking-wide">
         {title}
       </h2>
       {isLoading ? (
-        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+        <p className="text-xs bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-clip-text text-transparent animate-pulse">
           Loading response...
         </p>
       ) : content ? (
-        <div className="text-[13px] leading-[1.4] text-gray-100 bg-white/5 rounded-md p-3 whitespace-pre-wrap">
+        <div className="text-[13px] leading-[1.4] text-foreground bg-black/5 rounded-md p-3 whitespace-pre-wrap">
           <ReactMarkdown>{content}</ReactMarkdown>
         </div>
       ) : (
-        <div className="text-[13px] leading-[1.4] text-gray-300 bg-white/5 rounded-md p-3">
+        <div className="text-[13px] leading-[1.4] text-muted-foreground bg-black/5 rounded-md p-3">
           No response available
         </div>
       )}
@@ -297,7 +299,7 @@ const QuadrantCard = ({
   const renderContent = () => {
     if (isLoading) {
       return (
-        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+        <p className="text-xs bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-clip-text text-transparent animate-pulse">
           Loading {title.toLowerCase()}...
         </p>
       )
@@ -310,7 +312,7 @@ const QuadrantCard = ({
         <div className="relative w-full">
           <button
             onClick={copyToClipboard}
-            className="absolute top-2 right-2 text-xs text-white bg-white/10 hover:bg-white/20 rounded px-2 py-1 transition z-10"
+            className="absolute top-2 right-2 text-xs text-foreground bg-black/10 hover:bg-black/20 rounded px-2 py-1 transition z-10"
             disabled={!content}
           >
             {copied ? "Copied!" : "Copy"}
@@ -339,7 +341,7 @@ const QuadrantCard = ({
       )
     } else {
       return (
-        <div className="text-[13px] leading-[1.4] text-gray-100 prose prose-sm prose-invert max-w-none">
+        <div className="text-[13px] leading-[1.4] text-foreground prose prose-sm prose-invert max-w-none">
           <ReactMarkdown>{content}</ReactMarkdown>
         </div>
       )
@@ -349,7 +351,7 @@ const QuadrantCard = ({
   return (
     <Card className="bg-card/70 border-border/40 flex flex-col h-full">
       <CardHeader className="p-3">
-        <CardTitle className="text-sm font-bold text-white tracking-tight">
+        <CardTitle className="text-sm font-bold text-foreground tracking-tight">
           {title}
         </CardTitle>
       </CardHeader>
@@ -379,6 +381,12 @@ const Solutions: React.FC<SolutionsProps> = ({
   const [solutionData, setSolutionData] = useState<FourQuadrantData | null>(null)
   const [isLoading, setIsLoading] = useState(true) // Start loading initially
   const [problemStatement, setProblemStatement] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("problem")
+  const [rawAiResponse, setRawAiResponse] = useState<string | null>(null) // Store raw response
+  const [followUpQuestion, setFollowUpQuestion] = useState("") // State for follow-up input
+  const [isFollowUpLoading, setIsFollowUpLoading] = useState(false) // Loading state for follow-up
+  const [followUpAnswer, setFollowUpAnswer] = useState<string | null>(null) // State for follow-up answer
+  const latestJobIdRef = useRef<string | null>(null) // Ref to track the latest job ID
   
   // Use refs to keep track of listeners to prevent duplicates
   const listenersAttached = useRef(false)
@@ -462,6 +470,70 @@ const Solutions: React.FC<SolutionsProps> = ({
     window.electronAPI.cancelOngoingRequests() // Cancel if going back
   }
 
+  const handleFollowUpSubmit = async () => {
+    console.log("Follow-up submitted:", followUpQuestion);
+    setFollowUpAnswer(null); // Clear previous answer
+    setIsFollowUpLoading(true);
+
+    try {
+      const result = await window.electronAPI.processFollowUpQuestion({
+        previousResponse: rawAiResponse, // Pass the raw response as context
+        question: followUpQuestion,
+        language: currentLanguage
+      });
+
+      console.log("Follow-up response received:", result);
+
+      if (result && result.answer) {
+        setFollowUpAnswer(result.answer);
+      } else if (result && result.error) {
+        showToast({
+          title: "Follow-up Error",
+          message: result.error,
+          type: "error"
+        });
+      } else {
+         showToast({
+          title: "Follow-up Error",
+          message: "Received an unexpected response from the backend.",
+          type: "error"
+        });
+      }
+    } catch (error: any) {
+      console.error("Error calling processFollowUpQuestion:", error);
+      showToast({
+        title: "Follow-up Request Failed",
+        message: error.message || "An unknown error occurred.",
+        type: "error"
+      });
+    } finally {
+      setIsFollowUpLoading(false);
+    }
+  };
+
+  // Early return if no data yet AND not loading - represents an empty initial state or error state where nothing loaded
+  if (!solutionData && !isLoading) {
+    // This block should probably show a specific message like "Waiting for processing..." or handle the error case explicitly.
+    // For now, returning a minimal structure or null might be okay, but the main content shouldn't be here.
+    // Let's just return the header and a placeholder message.
+     return (
+      <div className="p-4 bg-transparent space-y-4 flex flex-col max-h-screen overflow-y-auto">
+        <SolutionCommands
+          setView={setView}
+          credits={credits}
+          currentLanguage={currentLanguage}
+          setLanguage={setLanguage}
+          onBack={handleBackToQueue}
+          onDebug={handleRunDebug} // Debug might not make sense here
+        />
+        <div className="flex-grow flex items-center justify-center">
+           <p className="text-gray-400">Waiting for solution data...</p> 
+        </div>
+      </div>
+     );
+  } // End of early return
+
+  // Main component render logic when loading OR when solutionData is available
   return (
     <div className="p-4 bg-transparent space-y-4 flex flex-col max-h-screen overflow-y-auto">
       {/* Header/Commands Section */}
@@ -529,6 +601,38 @@ const Solutions: React.FC<SolutionsProps> = ({
         <ScreenshotQueue view="solutions" setView={setView} />
       </div> */}
       
+      {/* Follow-up Question Section - Now correctly placed in the main return block */}
+      {solutionData && !isLoading && (
+        <div className="mt-6 p-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-lg border border-slate-700 shadow-lg">
+          <h3 className="text-lg font-semibold text-white mb-3">Ask a Follow-up Question</h3>
+          <Textarea
+            placeholder="Type your question about the solution here..."
+            value={followUpQuestion}
+            onChange={(e) => setFollowUpQuestion(e.target.value)}
+            className="bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500 mb-3"
+            rows={3}
+          />
+          <Button
+            onClick={handleFollowUpSubmit}
+            disabled={!followUpQuestion.trim() || isFollowUpLoading} // Disable during loading too
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+          >
+            {isFollowUpLoading ? "Submitting..." : "Submit Follow-up"}
+          </Button>
+        </div>
+      )}
+      
+      {/* Follow-up Answer Section - Now correctly placed */}
+      {isFollowUpLoading && (
+        <div className="mt-4 p-4 bg-slate-800 rounded-lg border border-slate-700"><p className="text-sm text-gray-300 animate-pulse">Getting answer...</p></div>
+      )}
+      {followUpAnswer && !isFollowUpLoading && (
+        <div className="mt-4 p-4 bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600 shadow-inner">
+           <h4 className="text-md font-semibold text-white mb-2">Follow-up Answer:</h4>
+           <div className="text-[13px] leading-[1.4] text-gray-100 prose prose-sm prose-invert max-w-none"><ReactMarkdown>{followUpAnswer}</ReactMarkdown></div>
+        </div>
+      )}
+
     </div>
   )
 }
