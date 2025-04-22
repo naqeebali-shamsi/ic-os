@@ -158,7 +158,24 @@ export class ShortcutsHelper {
         mainWindow.webContents.send("delete-last-screenshot")
       }
     })
-    
+
+    // NEW: View mode switching shortcuts
+    globalShortcut.register("CommandOrControl+Shift+B", () => {
+      console.log("Command/Ctrl+Shift+B pressed. Switching to Behavioral mode.")
+      const mainWindow = this.deps.getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("set-view-mode", "behavioral")
+      }
+    })
+
+    globalShortcut.register("CommandOrControl+Shift+C", () => {
+      console.log("Command/Ctrl+Shift+C pressed. Switching to Coding mode.")
+      const mainWindow = this.deps.getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("set-view-mode", "coding")
+      }
+    })
+
     // Unregister shortcuts when quitting
     app.on("will-quit", () => {
       globalShortcut.unregisterAll()

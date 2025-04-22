@@ -3,6 +3,9 @@
  * Utility class to parse and extract structured data from AI responses
  */
 
+// Import shared types
+import { ProblemExample } from "./types";
+
 export interface BasicSolutionData {
   code: string;
   thoughts: string[];
@@ -40,6 +43,37 @@ export interface FourQuadrantData {
     thinkingProcess: string;         // Markdown string
   };
 }
+
+// NEW: Define the structure for the narrative flow response
+export interface NarrativeSolutionData {
+  problemAnalysis: string; // Markdown: Goal, inputs/outputs, constraints
+  bruteForce: {
+    explanation: string; // Markdown explanation of the idea
+    codeOrPseudocode: string; // String containing code or pseudocode
+    timeComplexity: string;
+    spaceComplexity: string;
+    inefficiencyReason: string; // Markdown explaining why it's inefficient
+  };
+  optimizationStrategy: {
+    explanation: string; // Markdown: Transition, technique explanation
+    pseudocode: string;
+    timeComplexity: string;
+    spaceComplexity: string;
+  };
+  optimalImplementation: {
+    code: string; // Final commented code
+    dryRun: string; // Markdown: Detailed step-by-step dry run/table
+  };
+}
+
+export interface ProblemUnderstandingData {
+  understandingStatement: string; // AI's restatement of the problem
+  generatedExamples: ProblemExample[]; // Use type from ./types
+  clarifyingQuestions: string[]; // Any questions AI has (should be rare with examples)
+}
+
+// NEW: Union type for the response of the first analysis step
+export type InitialAnalysisResponse = ProblemUnderstandingData | { examplesPresent: true };
 
 export class ResponseParser {
   /**
@@ -396,47 +430,171 @@ export class ResponseParser {
   }
 
   /**
-   * Parses the response assuming it's a JSON string conforming to the FourQuadrantData structure.
+   * Parses the JSON response formatted according to the NarrativeSolutionData structure.
    */
-  public parseFourQuadrantResponse(responseContent: string): FourQuadrantData {
-    let parsedData: any;
+  // Rename and simplify parser for the new direct JSON structure
+  public parseNarrativeResponse(responseContent: string): NarrativeSolutionData {
+    console.log("Attempting to parse Narrative Response JSON...");
     try {
-      // Attempt to directly parse the JSON string
-      // First, clean potential markdown fences ```json ... ``` if they sneak in
-      const cleanedResponse = responseContent.replace(/^\s*```json\s*|\s*```\s*$/g, '').trim();
-      parsedData = JSON.parse(cleanedResponse);
-    } catch (error) {
-      console.error("Failed to parse FourQuadrant JSON:", error);
-      console.error("Raw response causing parse error:", responseContent.substring(0, 500)); // Log problematic response
-      // Return a default structure with error messages if parsing fails
-      return {
-        problemUnderstanding: "Error: Failed to parse Problem Understanding from AI response.",
-        bruteForceApproach: "Error: Failed to parse Brute Force Approach from AI response.",
-        optimalSolutionPseudocode: "Error: Failed to parse Optimal Pseudocode from AI response.",
-        optimalSolutionImplementation: {
-          code: "// Error: Failed to parse Optimal Implementation code.",
-          timeComplexity: "Error: Failed to parse complexity.",
-          spaceComplexity: "Error: Failed to parse complexity.",
-          thinkingProcess: "Error: Failed to parse thinking process."
-        }
-      };
-    }
-
-    // Validate the structure and provide defaults for missing fields
-    const validatedData: FourQuadrantData = {
-      problemUnderstanding: typeof parsedData.problemUnderstanding === 'string' ? parsedData.problemUnderstanding : "Missing: Problem Understanding.",
-      bruteForceApproach: typeof parsedData.bruteForceApproach === 'string' ? parsedData.bruteForceApproach : "Missing: Brute Force Approach.",
-      optimalSolutionPseudocode: typeof parsedData.optimalSolutionPseudocode === 'string' ? parsedData.optimalSolutionPseudocode : "Missing: Optimal Pseudocode.",
-      optimalSolutionImplementation: {
-        code: typeof parsedData.optimalSolutionImplementation?.code === 'string' ? parsedData.optimalSolutionImplementation.code : "// Missing: Optimal Implementation code.",
-        timeComplexity: typeof parsedData.optimalSolutionImplementation?.timeComplexity === 'string' ? parsedData.optimalSolutionImplementation.timeComplexity : "Missing: Time Complexity.",
-        spaceComplexity: typeof parsedData.optimalSolutionImplementation?.spaceComplexity === 'string' ? parsedData.optimalSolutionImplementation.spaceComplexity : "Missing: Space Complexity.",
-        thinkingProcess: typeof parsedData.optimalSolutionImplementation?.thinkingProcess === 'string' ? parsedData.optimalSolutionImplementation.thinkingProcess : "Missing: Thinking Process."
+      // Clean the response: remove potential markdown code blocks wrapping the JSON
+      const cleanedResponse = responseContent.replace(/```json\n?|```/g, '').trim();
+      
+      // Check if the cleaned response starts and ends with curly braces
+      if (!cleanedResponse.startsWith('{') || !cleanedResponse.endsWith('}')) {
+          console.error("Cleaned response does not appear to be a valid JSON object:", cleanedResponse.substring(0, 100));
+          throw new Error("AI response is not a valid JSON object.");
       }
-    };
 
-    return validatedData;
+      const parsedJson = JSON.parse(cleanedResponse);
+
+      // Basic validation: ensure essential sections exist
+      if (
+        !parsedJson.bruteForce ||
+        !parsedJson.optimizationStrategy ||
+        !parsedJson.optimalImplementation ||
+        !parsedJson.optimalImplementation.code ||
+        !parsedJson.optimalImplementation.dryRun
+      ) {
+        console.error("Parsed JSON is missing essential keys for NarrativeSolutionData:", parsedJson);
+        throw new Error("Parsed JSON does not match the expected NarrativeSolutionData structure.");
+      }
+
+      // Ensure problemAnalysis is present (use empty string if missing)
+      if (!parsedJson.problemAnalysis) {
+        parsedJson.problemAnalysis = '';
+      }
+
+      console.log("Successfully parsed Narrative Response JSON.");
+      // Directly return the parsed JSON as it should match the interface
+      return parsedJson as NarrativeSolutionData;
+
+    } catch (error) {
+      console.error("Failed to parse Narrative Response JSON:", error);
+      console.error("Original response content (first 500 chars):", responseContent.substring(0, 500));
+      // Provide a default/error structure or re-throw
+      throw new Error(`Failed to parse AI response into Narrative Solution structure. Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
+  
+  // Keep the old parseFourQuadrantResponse for reference or potential fallback, maybe rename?
+  // Or remove it if confident it's no longer needed.
+  /**
+   * OLD PARSER - Parses the JSON response formatted according to the FourQuadrantData structure.
+   * @deprecated Use parseNarrativeResponse instead.
+   */
+  public parseFourQuadrantResponse_DEPRECATED(responseContent: string): FourQuadrantData {
+      // ... (keep existing implementation of parseFourQuadrantResponse here) ...
+      console.log("Attempting to parse Four Quadrant JSON...");
+      try {
+        // Clean the response: remove potential markdown code blocks wrapping the JSON
+        const cleanedResponse = responseContent.replace(/\`\`\`json\n?|\`\`\`/g, '').trim();
+        
+        // Check if the cleaned response starts and ends with curly braces
+        if (!cleanedResponse.startsWith('{') || !cleanedResponse.endsWith('}')) {
+            console.error("Cleaned response does not appear to be a valid JSON object:", cleanedResponse.substring(0, 100));
+            throw new Error("AI response is not a valid JSON object.");
+        }
+  
+        const parsedJson = JSON.parse(cleanedResponse);
+  
+        // Basic validation
+        if (
+          !parsedJson.problemUnderstanding ||
+          !parsedJson.bruteForceApproach ||
+          !parsedJson.optimalSolutionPseudocode ||
+          !parsedJson.optimalSolutionImplementation ||
+          typeof parsedJson.optimalSolutionImplementation !== 'object' ||
+          !parsedJson.optimalSolutionImplementation.code
+        ) {
+          console.error("Parsed JSON is missing expected keys for FourQuadrantData:", parsedJson);
+          throw new Error("Parsed JSON does not match the expected FourQuadrantData structure.");
+        }
+  
+        console.log("Successfully parsed Four Quadrant JSON.");
+        // Directly return the parsed JSON as it should match the interface
+        return parsedJson as FourQuadrantData;
+  
+      } catch (error) {
+        console.error("Failed to parse Four Quadrant JSON:", error);
+        console.error("Original response content (first 500 chars):", responseContent.substring(0, 500));
+        // Provide a default/error structure or re-throw
+        throw new Error(`Failed to parse AI response into Four Quadrant structure. Error: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } // End parseFourQuadrantResponse_DEPRECATED
+
+  /**
+   * Parses the JSON response for the initial analysis step.
+   * Returns ProblemUnderstandingData | { examplesPresent: true }
+   */
+  public parseInitialAnalysisResponse(responseContent: string): InitialAnalysisResponse {
+    console.log("Attempting to parse Initial Analysis Response JSON...");
+    try {
+      const cleanedResponse = responseContent.replace(/\`\`\`json\n?|\`\`\`/g, '').trim();
+      if (!cleanedResponse.startsWith('{') || !cleanedResponse.endsWith('}')) {
+        throw new Error("Initial analysis response is not a valid JSON object.");
+      }
+      const parsedJson = JSON.parse(cleanedResponse);
+
+      // Check if it's the simple { examplesPresent: true } case
+      if (parsedJson.examplesPresent === true) {
+        console.log("Parsed Initial Analysis: Examples were present.");
+        return { examplesPresent: true };
+      }
+
+      // Otherwise, validate as ProblemUnderstandingData
+      if (
+        typeof parsedJson.understandingStatement !== 'string' ||
+        !Array.isArray(parsedJson.generatedExamples) ||
+        !Array.isArray(parsedJson.clarifyingQuestions)
+      ) {
+        console.error("Parsed JSON is missing expected keys for ProblemUnderstandingData:", parsedJson);
+        throw new Error("Parsed JSON does not match the expected ProblemUnderstandingData structure.");
+      }
+      // Optionally add deeper validation for generatedExamples structure if needed
+      
+      console.log("Parsed Initial Analysis: Generated Understanding/Examples.");
+      return parsedJson as ProblemUnderstandingData;
+
+    } catch (error) {
+      console.error("Failed to parse Initial Analysis Response JSON:", error);
+      console.error("Original response content (first 500 chars):", responseContent.substring(0, 500));
+      throw new Error(`Failed to parse AI response for initial analysis. Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Parses the JSON response after user clarification.
+   * Expects ProblemUnderstandingData structure.
+   */
+  public parseRefinedUnderstandingResponse(responseContent: string): ProblemUnderstandingData {
+    console.log("Attempting to parse Refined Understanding Response JSON...");
+    try {
+      const cleanedResponse = responseContent.replace(/\`\`\`json\n?|\`\`\`/g, '').trim();
+      if (!cleanedResponse.startsWith('{') || !cleanedResponse.endsWith('}')) {
+        throw new Error("Refined understanding response is not a valid JSON object.");
+      }
+      const parsedJson = JSON.parse(cleanedResponse);
+
+      // Validate as ProblemUnderstandingData
+      if (
+        typeof parsedJson.understandingStatement !== 'string' ||
+        !Array.isArray(parsedJson.generatedExamples) ||
+        !Array.isArray(parsedJson.clarifyingQuestions)
+      ) {
+        console.error("Parsed Refined JSON is missing expected keys for ProblemUnderstandingData:", parsedJson);
+        throw new Error("Parsed Refined JSON does not match the expected ProblemUnderstandingData structure.");
+      }
+      
+      console.log("Parsed Refined Understanding Response.");
+      return parsedJson as ProblemUnderstandingData;
+
+    } catch (error) {
+      console.error("Failed to parse Refined Understanding Response JSON:", error);
+      console.error("Original response content (first 500 chars):", responseContent.substring(0, 500));
+      throw new Error(`Failed to parse AI response for refined understanding. Error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
 }
 
 // Export a singleton instance

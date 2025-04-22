@@ -10,6 +10,10 @@
   * AI Problem Analysis: Extraction and understanding of requirements via Vision models (GPT-4o, potentially Gemini and others).
   * Solution Generation: Detailed solutions with explanations (Problem Understanding, Brute Force, Optimal Pseudocode, Optimal Analysis+Code), complexity analysis, and inline code comments.
   * Real-time Debugging: AI-assisted identification and correction of code errors based on screenshots.
+  * **Behavioral Question Assistance (Planned):** 
+    * AI analysis of behavioral questions to identify relevant principles (e.g., Amazon LPs).
+    * Retrieval of pre-written STAR-formatted stories based on identified principles.
+    * AI-powered selection of the best story, or fallback generation if no match exists.
 * **User Experience:**
   * Invisibility: Undetectable window to bypass screen capture during interviews (with compatibility notes).
   * Window Management: Move, resize, opacity control, zoom.

@@ -2,16 +2,21 @@
 import fs from "node:fs"
 import * as axios from "axios"
 import { BrowserWindow } from "electron"
-import { IProcessingHelperDeps } from "./main"
+import { IProcessingHelperDeps, ProblemInfo } from "./main"
 import { ScreenshotHelper } from "./ScreenshotHelper"
 import { configHelper } from "./ConfigHelper"
 import { aiService } from "./AIService"
-import { responseParser } from "./ResponseParser"
+import { responseParser, InitialAnalysisResponse, ProblemExample, ProblemUnderstandingData } from "./ResponseParser"
 import { solutionProcessor } from "./SolutionProcessor"
+import { getProblemUnderstandingPrompt, getRefinedUnderstandingPrompt } from "../prompts"
 
 export class ProcessingHelper {
   private deps: IProcessingHelperDeps
   private screenshotHelper: ScreenshotHelper
+
+  // Add state for confirmed understanding/examples
+  private confirmedUnderstanding: string | null = null;
+  private confirmedExamples: ProblemExample[] | null = null;
 
   // AbortControllers for API requests
   private currentProcessingAbortController: AbortController | null = null
@@ -19,7 +24,7 @@ export class ProcessingHelper {
 
   constructor(deps: IProcessingHelperDeps) {
     this.deps = deps
-    this.screenshotHelper = deps.getScreenshotHelper()
+    this.screenshotHelper = deps.getScreenshotHelper() || new ScreenshotHelper(deps.getView ? deps.getView() : 'queue')
   }
 
   private async waitForInitialization(
@@ -90,10 +95,12 @@ export class ProcessingHelper {
   }
 
   public async processScreenshots(): Promise<void> {
+    console.log("[ProcessingHelper] processScreenshots invoked. View=", this.deps.getView());
     const mainWindow = this.deps.getMainWindow()
     if (!mainWindow) return
 
     // First verify we have a valid AI client
+    console.log("[ProcessingHelper] Checking AI client...");
     if (!aiService.hasValidClient()) {
       console.error("AI client not initialized");
       mainWindow.webContents.send(
@@ -126,9 +133,12 @@ export class ProcessingHelper {
       }
 
       try {
-        // Initialize AbortController
-        this.currentProcessingAbortController = new AbortController()
-        const { signal } = this.currentProcessingAbortController
+        // Ensure existing processing is cancelled
+        if (this.currentProcessingAbortController) {
+          this.currentProcessingAbortController.abort();
+        }
+        this.currentProcessingAbortController = new AbortController();
+        const signal = this.currentProcessingAbortController.signal;
 
         const screenshots = await Promise.all(
           existingScreenshots.map(async (path) => {
@@ -152,33 +162,46 @@ export class ProcessingHelper {
           throw new Error("Failed to load screenshot data");
         }
 
-        const result = await this.processScreenshotsHelper(validScreenshots, signal)
+        // STEP 1: Initial Analysis (Problem Extraction & Understanding/Examples)
+        const initialResult = await this.processScreenshotsHelper(validScreenshots, signal);
+        if (!initialResult.success || !initialResult.data) {
+            throw new Error(initialResult.error || "Failed during initial analysis step.");
+        }
+        
+        // Store problem info (already done in processScreenshotsHelper)
+        const problemInfo = initialResult.problemInfo;
 
-        if (!result.success) {
-          console.log("Processing failed:", result.error)
-          if (result.error?.includes("API Key") || result.error?.includes("AI client")) {
-            mainWindow.webContents.send(
-              this.deps.PROCESSING_EVENTS.API_KEY_INVALID
-            )
-          } else {
-            mainWindow.webContents.send(
-              this.deps.PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR,
-              result.error
-            )
-          }
-          // Reset view back to queue on error
-          console.log("Resetting view to queue due to error")
-          this.deps.setView("queue")
-          return
+        // Check if initial analysis determined examples were present (skip confirmation)
+        if (typeof initialResult.data === 'object' && 'examplesPresent' in initialResult.data && initialResult.data.examplesPresent === true) {
+            console.log("Examples present in initial screenshots. Skipping confirmation.");
+            // Set confirmed state directly from problemInfo (assuming it's accurate)
+            this.confirmedUnderstanding = problemInfo?.problem_statement || "Extracted directly"; // Or derive a better understanding if possible
+            this.confirmedExamples = [
+              { input: problemInfo?.example_input || "N/A", output: problemInfo?.example_output || "N/A" }
+            ];
+            // Trigger solution generation directly
+            mainWindow.webContents.send("processing-status", { message: "Skipping confirmation, generating solution...", progress: 45 });
+            const solutionResult = await this.generateSolutionsHelper(signal);
+            if (solutionResult.success && solutionResult.data) {
+                mainWindow.webContents.send(this.deps.PROCESSING_EVENTS.SOLUTION_SUCCESS, solutionResult.data);
+            } else {
+                throw new Error(solutionResult.error || "Solution generation failed after skipping confirmation.");
+            }
+        } 
+        // Check if initial analysis returned understanding data (needs confirmation)
+        else if (typeof initialResult.data === 'object' && 'understandingStatement' in initialResult.data) {
+            console.log("Initial understanding generated. Sending to renderer for confirmation.");
+            // Store understanding/examples temporarily before confirmation
+            // Note: We don't set confirmed state here yet.
+            mainWindow.webContents.send("understanding-generated", initialResult.data); 
+            mainWindow.webContents.send("processing-status", { message: "Waiting for user confirmation...", progress: 45 });
+            // --- Workflow pauses here. Resumes when user confirms/clarifies via IPC --- 
+        } else {
+            // Handle unexpected response from initial analysis
+            throw new Error("Unexpected response format from initial analysis.");
         }
 
-        // Only set view to solutions if processing succeeded
-        console.log("Setting view to solutions after successful processing")
-        mainWindow.webContents.send(
-          this.deps.PROCESSING_EVENTS.SOLUTION_SUCCESS,
-          result.data
-        )
-        this.deps.setView("solutions")
+        // End of initial queue branch
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         mainWindow.webContents.send(
@@ -241,7 +264,7 @@ export class ProcessingHelper {
         const screenshots = await Promise.all(
           allPaths.map(async (path) => {
             try {
-              if (!fs.existsSync(path)) {
+              if (!fs.existsSync(path)) {``
                 console.warn(`Screenshot file does not exist: ${path}`);
                 return null;
               }
@@ -309,28 +332,26 @@ export class ProcessingHelper {
   private async processScreenshotsHelper(
     screenshots: Array<{ path: string; data: string }>,
     signal: AbortSignal
-  ) {
+  ): Promise<{
+    success: boolean;
+    data?: InitialAnalysisResponse;
+    problemInfo?: ProblemInfo | null;
+    error?: string;
+  }> {
+    const mainWindow = this.deps.getMainWindow();
+    if (!mainWindow) return { success: false, error: 'Main window not available' };
     try {
+      console.log('[ProcessingHelper] Starting initial analysis helper');
       const language = await this.getLanguage();
-      const mainWindow = this.deps.getMainWindow();
-      
-      // Update the user on progress
-      if (mainWindow) {
-        mainWindow.webContents.send("processing-status", {
-          message: "Analyzing problem from screenshots...",
-          progress: 20
-        });
-      }
+      console.log('[ProcessingHelper] Detected language:', language);
 
-      // Extract the problem information using Vision API
-      const imageDataList = screenshots.map(screenshot => screenshot.data);
-      
-      // Define the system prompt for extraction
-      const systemPrompt = "You are a coding challenge interpreter. Analyze the screenshot of the coding problem and extract all relevant information. Return the information in JSON format with these fields: problem_statement, constraints, example_input, example_output. Just return the structured JSON without any other text.";
-      
-      // Get the vision-based completion
-      const extractionPrompt = `Extract the coding problem details from these screenshots. Return in JSON format. Preferred coding language we gonna use for this problem is ${language}.`;
-      
+      // Extract problem info from screenshots
+      mainWindow.webContents.send('processing-status', { message: 'Extracting problem information...', progress: 20 });
+      const imageDataList = screenshots.map(s => s.data);
+      const systemPrompt =
+        'You are a coding challenge interpreter. Extract problem details from screenshots in JSON with fields: problem_statement, constraints, example_input, example_output.';
+      const extractionPrompt =
+        `Extract the coding problem details from these screenshots in JSON. Language: ${language}`;
       const responseText = await aiService.generateVisionCompletion(
         extractionPrompt,
         imageDataList,
@@ -338,80 +359,31 @@ export class ProcessingHelper {
         undefined,
         signal
       );
-      
-      // Parse the JSON response
-      let problemInfo;
+      const jsonText = responseText.replace(/```json|```/g, '').trim();
+      let problemInfo: ProblemInfo | null = null;
       try {
-        // Handle when AI might wrap the JSON in markdown code blocks
-        const jsonText = responseText.replace(/```json|```/g, '').trim();
-        problemInfo = JSON.parse(jsonText);
-      } catch (error) {
-        console.error("Error parsing AI response:", error);
-        return {
-          success: false,
-          error: "Failed to parse problem information. Please try again or use clearer screenshots."
-        };
-      }
-      
-      // Update progress
-      if (mainWindow) {
-        mainWindow.webContents.send("processing-status", {
-          message: "Problem analyzed successfully. Preparing to generate solution...",
-          progress: 40
-        });
+        problemInfo = JSON.parse(jsonText) as ProblemInfo;
+      } catch (e) {
+        console.error("Failed to parse extracted JSON:", jsonText, e);
+        return { success: false, error: "Failed to parse AI response as JSON." };
       }
 
-      // Store problem info in AppState
+      console.log('[ProcessingHelper] Extracted problemInfo:', problemInfo);
+      // Pass the parsed problemInfo
       this.deps.setProblemInfo(problemInfo);
+      mainWindow.webContents.send(this.deps.PROCESSING_EVENTS.PROBLEM_EXTRACTED, problemInfo);
 
-      // Send first success event
-      if (mainWindow) {
-        mainWindow.webContents.send(
-          this.deps.PROCESSING_EVENTS.PROBLEM_EXTRACTED,
-          problemInfo
-        );
+      // Perform initial understanding & example generation
+      mainWindow.webContents.send('processing-status', { message: 'Generating understanding & examples...', progress: 40 });
+      const { promptText, systemPrompt: sysPrompt } = getProblemUnderstandingPrompt(problemInfo);
+      const analysisResponse = await aiService.generateCompletion(promptText, sysPrompt, undefined, signal);
+      const initialAnalysis = responseParser.parseInitialAnalysisResponse(analysisResponse);
+      console.log('[ProcessingHelper] Initial analysis result:', initialAnalysis);
 
-        // Generate solutions after successful extraction
-        const solutionsResult = await this.generateSolutionsHelper(signal);
-        if (solutionsResult.success) {
-          // Clear any existing extra screenshots before transitioning to solutions view
-          this.screenshotHelper.clearExtraScreenshotQueue();
-          
-          // Final progress update
-          mainWindow.webContents.send("processing-status", {
-            message: "Solution generated successfully",
-            progress: 100
-          });
-          
-          mainWindow.webContents.send(
-            this.deps.PROCESSING_EVENTS.SOLUTION_SUCCESS,
-            solutionsResult.data
-          );
-          return { success: true, data: solutionsResult.data };
-        } else {
-          throw new Error(
-            solutionsResult.error || "Failed to generate solutions"
-          );
-        }
-      }
-
-      return { success: false, error: "Failed to process screenshots" };
-    } catch (error: unknown) {
-      // If the request was cancelled, don't retry
-      if (axios.isCancel(error)) {
-        return {
-          success: false,
-          error: "Processing was canceled by the user."
-        };
-      }
-      
-      // Handle API errors with more specific messaging
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      console.error("API Error Details:", error);
-      return { 
-        success: false, 
-        error: errorMessage || "Failed to process screenshots. Please try again." 
-      };
+      return { success: true, data: initialAnalysis, problemInfo };
+    } catch (error) {
+      console.error('[ProcessingHelper] processScreenshotsHelper error:', error);
+      return { success: false, error: (error as Error).message || 'Unknown error' };
     }
   }
 
@@ -421,25 +393,28 @@ export class ProcessingHelper {
       const language = await this.getLanguage();
       const mainWindow = this.deps.getMainWindow();
       
-      if (!problemInfo) {
-        throw new Error("No problem info available");
-      }
+      // Retrieve the confirmed understanding and examples from state
+      const understanding = this.confirmedUnderstanding;
+      const examples = this.confirmedExamples;
 
-      // --- Proceed with original logic --- 
-      console.log("Proceeding with full solution generation..."); // Simplified log
+      if (!problemInfo) throw new Error("No problem info available for solution generation.");
+      if (!understanding) throw new Error("Confirmed understanding is missing for solution generation.");
+      if (!examples) throw new Error("Confirmed examples are missing for solution generation.");
+
+      console.log("Generating solution with confirmed understanding:", understanding);
       if (mainWindow) {
-        mainWindow.webContents.send("processing-status", {
-          message: "Generating comprehensive analysis...",
-          progress: 50 // Keep progress update
-        });
+        // Status message already sent by caller
+        // mainWindow.webContents.send("processing-status", { message: "Generating comprehensive analysis...", progress: 50 });
       }
 
-      // Use the existing SolutionProcessor (which gets prompts internally)
+      // Pass the confirmed data to solutionProcessor
       return await solutionProcessor.generateSolutions(
         problemInfo,
         language,
         mainWindow,
-        signal
+        signal,
+        understanding, // Pass confirmed understanding
+        examples       // Pass confirmed examples
       );
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -569,5 +544,70 @@ If you include code examples, use proper markdown code blocks with language spec
     if (wasCancelled && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(this.deps.PROCESSING_EVENTS.NO_SCREENSHOTS)
     }
+  }
+
+  // Method called by IPC handler when user SUBMITS CLARIFICATION
+  public async handleUserClarification(userClarification: string, signal: AbortSignal): Promise<ProblemUnderstandingData> {
+      const problemInfo = this.deps.getProblemInfo();
+      // TODO: Need to retrieve the *previous* understanding state sent to the user
+      // This might require storing it temporarily when "understanding-generated" is emitted
+      const previousUnderstanding = "Placeholder: Retrieve previous understanding";
+      const previousExamples: ProblemExample[] = []; // Placeholder
+      const previousQuestions: string[] = []; // Placeholder
+
+      if (!problemInfo) throw new Error("Cannot process clarification: Problem info missing.");
+      
+      const mainWindow = this.deps.getMainWindow();
+      if (mainWindow) mainWindow.webContents.send("processing-status", { message: "Generating refined understanding...", progress: 55 });
+
+      const { promptText, systemPrompt } = getRefinedUnderstandingPrompt(
+          problemInfo, 
+          previousUnderstanding, 
+          previousExamples, 
+          previousQuestions, 
+          userClarification
+      );
+      const responseContent = await aiService.generateCompletion(promptText, systemPrompt, undefined, signal);
+      const refinedData = responseParser.parseRefinedUnderstandingResponse(responseContent);
+      
+      // Send refined data back to UI for potential re-confirmation?
+      // Or directly proceed to solution generation? Let's assume proceed for now.
+      console.log("Refined understanding generated. Proceeding to solution.");
+      this.confirmedUnderstanding = refinedData.understandingStatement;
+      this.confirmedExamples = refinedData.generatedExamples;
+      
+      if (mainWindow) mainWindow.webContents.send("understanding-generated", refinedData); // Update UI with refined understanding
+      await this.triggerSolutionGenerationAfterConfirmation(signal);
+
+      return refinedData; // Return refined data (though flow proceeds async)
+  }
+
+  // Method called by IPC handler when user CONFIRMS understanding (or after clarification)
+  public async triggerSolutionGenerationAfterConfirmation(signal: AbortSignal): Promise<void> {
+      const mainWindow = this.deps.getMainWindow();
+      if (!mainWindow) return;
+      const problemInfo = this.deps.getProblemInfo();
+
+      if (!problemInfo || !this.confirmedUnderstanding || !this.confirmedExamples) {
+          console.error("Missing confirmed data for solution generation.");
+          mainWindow.webContents.send(this.deps.PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR, "Missing confirmed data.");
+          return;
+      }
+
+      try {
+          mainWindow.webContents.send("processing-status", { message: "User confirmed, generating solution...", progress: 50 });
+          
+          const solutionResult = await this.generateSolutionsHelper(signal);
+          if (solutionResult.success && solutionResult.data) {
+              mainWindow.webContents.send(this.deps.PROCESSING_EVENTS.SOLUTION_SUCCESS, solutionResult.data);
+          } else {
+              throw new Error(solutionResult.error || "Solution generation failed after confirmation.");
+          }
+      } catch (error) {
+          console.error("Error during solution generation after confirmation:", error);
+          const errorMessage = error instanceof Error ? error.message : "Unknown error during solution generation";
+          mainWindow.webContents.send("processing-status", { error: errorMessage });
+          mainWindow.webContents.send(this.deps.PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR, errorMessage);
+      }
   }
 }

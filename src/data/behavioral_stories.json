@@ -1,0 +1,170 @@
+[
+    {
+      "id": "story-001",
+      "title": "Automating JIRA Grooming for Splunk App Reviews",
+      "principles": [
+        "Invent and Simplify",
+        "Bias for Action"
+      ],
+      "situation": "Manual review of third-party vendor submissions for Splunk app reviews was time-consuming and error-prone due to the lack of a Splunkbase API.",
+      "task": "Identify a way to streamline and automate the process of reviewing and updating JIRA tickets based on Splunkbase app data.",
+      "action": "Built a Python script using Selenium to scrape Splunkbase, transform data, and push updates to JIRA via API. Hosted it on AWS and scheduled it for periodic execution.",
+      "result": "Saved several hours weekly, reduced manual errors, and streamlined the review process."
+    },
+    {
+      "id": "story-002",
+      "title": "AI-Based Whale Audio Classification",
+      "principles": [
+        "Learn and Be Curious",
+        "Insist on the Highest Standards"
+      ],
+      "situation": "Endangered whale species identification required processing messy, imbalanced underwater acoustic data.",
+      "task": "Build a model that can reliably classify whale species despite limited data for certain classes.",
+      "action": "Used MFCC for feature extraction, trained classifiers, and experimented with GANs to generate synthetic samples for underrepresented classes.",
+      "result": "Improved classification accuracy, achieved more balanced predictions, and developed a framework for conservation-related audio ML tasks."
+    },
+    {
+      "id": "story-003",
+      "title": "Automating LinkedIn Outreach for Lead Generation",
+      "principles": [
+        "Ownership",
+        "Deliver Results"
+      ],
+      "situation": "A digital services firm was relying on manual LinkedIn outreach, resulting in limited lead generation.",
+      "task": "Automate the B2B lead generation process and increase lead engagement.",
+      "action": "Built a system to extract leads, enrich data with emails, schedule campaigns, and optimize messaging through A/B testing.",
+      "result": "Increased lead response rate, generated 15+ qualified leads/month, and closed 2\u20133 new clients using the setup."
+    },
+    {
+      "id": "story-004",
+      "title": "Smart Gardening IoT Simulator",
+      "principles": [
+        "Think Big",
+        "Frugality"
+      ],
+      "situation": "Lacked access to real hardware sensors for building an IoT-based gardening system.",
+      "task": "Develop a simulation-based system that mimics real-world IoT behavior for soil and light sensors.",
+      "action": "Built virtual sensors in C++, implemented environmental rules, added UI and gamification features for user interaction.",
+      "result": "Created a testable prototype for future IoT deployment without incurring hardware costs."
+    },
+    {
+      "id": "story-005",
+      "title": "Resume Parser for University Club",
+      "principles": [
+        "Customer Obsession",
+        "Dive Deep"
+      ],
+      "situation": "Manually sorting student resumes into relevant interview categories was inefficient and error-prone.",
+      "task": "Create an automated system to classify resumes by skillsets for mock interview matching.",
+      "action": "Built a Python parser using regex and keyword matching, refined with manual review and synonym mapping.",
+      "result": "Reduced sorting time drastically and improved match quality for interview sessions."
+    },
+    {
+      "id": "story-006",
+      "title": "Windows Wi-Fi Control Script",
+      "principles": [
+        "Bias for Action",
+        "Are Right, A Lot"
+      ],
+      "situation": "Available Wi-Fi control scripts relied on Docker or unsupported tools on Windows.",
+      "task": "Develop a native script for controlling Wi-Fi interfaces on Windows.",
+      "action": "Wrote a PowerShell and batch script combo, tested on multiple setups, handled missing driver cases.",
+      "result": "Reliable, portable tool shared among peers and used in automation workflows."
+    },
+    {
+      "id": "story-007",
+      "title": "Lead Routing Workflow for Marketing Agency",
+      "principles": [
+        "Earn Trust",
+        "Insist on the Highest Standards"
+      ],
+      "situation": "Lead management across multiple channels was chaotic and resulted in missed opportunities.",
+      "task": "Design an efficient routing system for incoming leads with filtering and tracking.",
+      "action": "Used Google Sheets + Zapier + APIs to collect, categorize, and assign leads based on criteria; added SLA and timestamp tracking.",
+      "result": "Improved lead follow-up speed and lead-to-meeting conversion rate by 30%."
+    },
+    {
+      "id": "story-008",
+      "title": "Enhancing Selenium Testing at Opas Mobile",
+      "principles": [
+        "Invent and Simplify",
+        "Are Right, A Lot"
+      ],
+      "situation": "At Opas Mobile, the test coverage was low and relied heavily on manual testing for UI features across devices.",
+      "task": "Improve reliability and consistency of the CI/CD testing process without introducing heavy overhead.",
+      "action": "I created a modular Selenium-based framework with preconfigured test suites for commonly used flows. Integrated it with our CI/CD pipeline and trained the team to add new test cases easily.",
+      "result": "Regression testing became 3x faster, bugs were caught early, and the framework was adopted by other interns and the QA lead for new modules."
+    },
+    {
+      "id": "story-009",
+      "title": "Device-Level GenAI Scam Detection Prototype",
+      "principles": [
+        "Think Big",
+        "Customer Obsession"
+      ],
+      "situation": "During a Cognizant GenAI hackathon, we identified a real user pain: scam calls and texts slipping past existing filters.",
+      "task": "Design a solution that detects financial scam attempts in real time without compromising user privacy.",
+      "action": "We proposed a device-level GenAI model that processes calls and texts locally, flags threats, and adapts to scam patterns. I worked on the prototype architecture and on-device constraints.",
+      "result": "Our solution won the runner-up prize and received praise for balancing user safety with privacy by not routing data to the cloud."
+    },
+    {
+      "id": "story-010",
+      "title": "Rebounder: A Collaborative Interview Prep Platform",
+      "principles": [
+        "Earn Trust",
+        "Deliver Results"
+      ],
+      "situation": "For a university project, we built an AI-powered mock interview platform to help students practice behavioral and coding interviews.",
+      "task": "Lead backend development and ensure the project stayed on track with a diverse team and evolving scope.",
+      "action": "I set up the project milestones, built the question handling system, and ensured our feedback mechanism was customizable. I also coordinated standups and helped debug frontend blockers.",
+      "result": "The project was well-received by the professor, fully functional, and used by classmates post-submission for real interview prep."
+    },
+    {
+      "id": "story-011",
+      "title": "TrailScout: Designing for Hikers' Real Needs",
+      "principles": [
+        "Customer Obsession",
+        "Dive Deep"
+      ],
+      "situation": "In our UI/UX course, we had to design an outdoor navigation app for smartwatches that could assist hikers and bikers.",
+      "task": "Identify core needs of on-trail users and translate them into intuitive interface flows.",
+      "action": "I led user research through interviews, tested paper prototypes with mock hikers, and built the location and emergency alert flows. We focused on usability during motion and gloves.",
+      "result": "Our final design received top marks, and peers praised its practicality and minimal cognitive load \u2014 exactly what trail users need."
+    },
+    {
+      "id": "story-012",
+      "title": "DalTrac Hackathon: Replacing IVR with an AI Agent",
+      "principles": [
+        "Frugality",
+        "Bias for Action"
+      ],
+      "situation": "Halifax\u2019s public bus system relied on a legacy IVR system with high salary costs and long wait times.",
+      "task": "Build a cost-effective alternative that improves responsiveness for users.",
+      "action": "I proposed using AWS Lex and Lambda to prototype an AI agent for bus schedule queries. We built and demoed the voice agent during the hackathon.",
+      "result": "We placed runner-up and got feedback from judges that it could save thousands in operational costs and drastically cut user wait time."
+    },
+    {
+      "id": "story-013",
+      "title": "Quizcraft: Multiplayer Trivia Under Pressure",
+      "principles": [
+        "Invent and Simplify",
+        "Have Backbone; Disagree and Commit"
+      ],
+      "situation": "In a university project for Quizcraft, our team was overengineering a multiplayer quiz system with separate microservices.",
+      "task": "Ensure that the system could scale but still be built within our course timeline.",
+      "action": "I disagreed with the team\u2019s original complex architecture and proposed a simplified monolith with modular services. I showed benchmarks and walkthroughs to explain my view. Once aligned, I helped rebuild the app\u2019s backbone.",
+      "result": "We completed on time, got praised for real-time sync and leaderboard accuracy, and my decision helped us avoid project burnout."
+    },
+    {
+      "id": "story-014",
+      "title": "WhaleWatchers Hackathon: Simulating Whale Distress Calls",
+      "principles": [
+        "Learn and Be Curious",
+        "Insist on the Highest Standards"
+      ],
+      "situation": "Whale sound datasets were limited, especially distress signals, making it hard to train detection models.",
+      "task": "Build a generative system that creates realistic whale distress audio to aid in ML training.",
+      "action": "I explored VAEs and GANs, fine-tuned on sparse labeled whale audio, and tested the synthetic signals via spectrogram analysis. We also consulted marine audio research to keep it authentic.",
+      "result": "The results were realistic enough that judges noted its potential for real-world application in marine rescue operations."
+    }
+  ]

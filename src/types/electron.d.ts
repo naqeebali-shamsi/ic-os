@@ -1,3 +1,17 @@
+export type ViewMode = 'coding' | 'behavioral' | 'settings';
+
+// Define the structure for BehavioralStory if not already globally available
+// Ideally, share this type between frontend and backend
+interface BehavioralStory { 
+  id: string;
+  title: string;
+  principles: string[];
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+}
+
 export interface ElectronAPI {
   // Original methods
   openSubscriptionPortal: (authData: {
@@ -52,15 +66,40 @@ export interface ElectronAPI {
   onOutOfCredits: (callback: () => void) => () => void
   openSettingsPortal: () => Promise<void>
   getPlatform: () => string
+  cancelOngoingRequests: () => Promise<{ success: boolean }>
+  processFollowUpQuestion: (args: { previousOptimalCode: string; previousOptimalDryRun: string; problemAnalysis: string; question: string; language: string }) => Promise<{ success: boolean; data?: { code: string; dryRun: string }; error?: string }>
   
   // New methods for OpenAI integration
-  getConfig: () => Promise<{ apiKey: string; model: string }>
-  updateConfig: (config: { apiKey?: string; model?: string }) => Promise<boolean>
+  getConfig: () => Promise<{ apiKey: string; model: string; language?: string; provider?: string; opacity?: number }>
+  updateConfig: (config: { apiKey?: string; model?: string; language?: string; provider?: string; opacity?: number }) => Promise<boolean>
   checkApiKey: () => Promise<boolean>
   validateApiKey: (apiKey: string) => Promise<{ valid: boolean; error?: string }>
   openLink: (url: string) => void
   onApiKeyInvalid: (callback: () => void) => () => void
   removeListener: (eventName: string, callback: (...args: any[]) => void) => void
+
+  // NEW: View mode switching
+  onSetViewMode: (callback: (mode: ViewMode) => void) => () => void;
+
+  // New methods for two-step confirmation
+  submitUserClarification: (clarification: string) => Promise<{ success: boolean; error?: string; understanding?: string }>
+  triggerSolutionGeneration: () => Promise<{ success: boolean; error?: string }>
+  onUnderstandingGenerated: (callback: (understanding: string) => void) => () => void
+
+  // NEW: Behavioral Question Processing
+  processBehavioralQuestion: (question: string) => Promise<{ 
+    success: boolean; 
+    selectedStory?: BehavioralStory; 
+    reasoning?: string; 
+    error?: string 
+  }>;
+
+  // NEW: Behavioral Follow-up Processing
+  processBehavioralFollowUp: (args: { 
+    originalQuestion: string; 
+    selectedStory: BehavioralStory; 
+    followUpQuestion: string; 
+  }) => Promise<{ success: boolean; explanation?: string; error?: string }>;
 }
 
 declare global {

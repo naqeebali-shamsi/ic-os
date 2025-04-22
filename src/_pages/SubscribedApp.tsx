@@ -3,7 +3,9 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 import Queue from "../_pages/Queue"
 import Solutions from "../_pages/Solutions"
+import BehavioralAssistant from "../pages/BehavioralAssistant"
 import { useToast } from "../contexts/toast"
+import { ViewMode } from "../../src/types/electron.d.ts"
 
 interface SubscribedAppProps {
   credits: number
@@ -17,34 +19,39 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
   setLanguage
 }) => {
   const queryClient = useQueryClient()
-  const [view, setView] = useState<"queue" | "solutions" | "debug">("queue")
+  const [currentMode, setCurrentMode] = useState<ViewMode>('coding')
+  const [codingSubView, setCodingSubView] = useState<'queue' | 'solutions'>('queue')
   const containerRef = useRef<HTMLDivElement>(null)
   const { showToast } = useToast()
 
-  // Let's ensure we reset queries etc. if some electron signals happen
+  useEffect(() => {
+    const cleanup = window.electronAPI.onSetViewMode((mode) => {
+      console.log(`Switching mode to: ${mode}`);
+      setCurrentMode(mode);
+      if (mode === 'coding') {
+        setCodingSubView('queue');
+      } else if (mode === 'behavioral') {
+        // Reset or setup behavioral state here if needed
+      } else if (mode === 'settings') {
+        // Setup settings state if needed
+      }
+    });
+    return cleanup;
+  }, []);
+
   useEffect(() => {
     const cleanup = window.electronAPI.onResetView(() => {
-      queryClient.invalidateQueries({
-        queryKey: ["screenshots"]
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["problem_statement"]
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["solution"]
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["new_solution"]
-      })
-      setView("queue")
+      queryClient.invalidateQueries({ queryKey: ["screenshots"] })
+      queryClient.invalidateQueries({ queryKey: ["problem_statement"] })
+      queryClient.invalidateQueries({ queryKey: ["solution"] })
+      queryClient.invalidateQueries({ queryKey: ["new_solution"] })
+      setCurrentMode('coding')
+      setCodingSubView('queue')
     })
 
-    return () => {
-      cleanup()
-    }
-  }, [])
+    return cleanup
+  }, [queryClient])
 
-  // Dynamically update the window size
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -55,10 +62,8 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
       window.electronAPI?.updateContentDimensions({ width, height })
     }
 
-    // Force initial dimension update immediately
     updateDimensions()
     
-    // Set a fallback timer to ensure dimensions are set even if content isn't fully loaded
     const fallbackTimer = setTimeout(() => {
       window.electronAPI?.updateContentDimensions({ width: 800, height: 600 })
     }, 500)
@@ -66,7 +71,6 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
     const resizeObserver = new ResizeObserver(updateDimensions)
     resizeObserver.observe(containerRef.current)
 
-    // Also watch DOM changes
     const mutationObserver = new MutationObserver(updateDimensions)
     mutationObserver.observe(containerRef.current, {
       childList: true,
@@ -75,7 +79,6 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
       characterData: true
     })
 
-    // Do another update after a delay to catch any late-loading content
     const delayedUpdate = setTimeout(updateDimensions, 1000)
 
     return () => {
@@ -84,46 +87,25 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
       clearTimeout(fallbackTimer)
       clearTimeout(delayedUpdate)
     }
-  }, [view])
+  }, [currentMode, codingSubView])
 
-  // Listen for events that might switch views or show errors
   useEffect(() => {
     const cleanupFunctions = [
       window.electronAPI.onSolutionStart(() => {
-        setView("solutions")
+        if (currentMode === 'coding') {
+          setCodingSubView("solutions");
+        }
       }),
       window.electronAPI.onUnauthorized(() => {
-        queryClient.removeQueries({
-          queryKey: ["screenshots"]
-        })
-        queryClient.removeQueries({
-          queryKey: ["solution"]
-        })
-        queryClient.removeQueries({
-          queryKey: ["problem_statement"]
-        })
-        setView("queue")
-      }),
-      window.electronAPI.onResetView(() => {
-        queryClient.removeQueries({
-          queryKey: ["screenshots"]
-        })
-        queryClient.removeQueries({
-          queryKey: ["solution"]
-        })
-        queryClient.removeQueries({
-          queryKey: ["problem_statement"]
-        })
-        setView("queue")
-      }),
-      window.electronAPI.onResetView(() => {
-        queryClient.setQueryData(["problem_statement"], null)
+        queryClient.removeQueries({ queryKey: ["screenshots"] })
+        queryClient.removeQueries({ queryKey: ["solution"] })
+        queryClient.removeQueries({ queryKey: ["problem_statement"] })
+        setCurrentMode('coding')
+        setCodingSubView('queue')
       }),
       window.electronAPI.onProblemExtracted((data: any) => {
-        if (view === "queue") {
-          queryClient.invalidateQueries({
-            queryKey: ["problem_statement"]
-          })
+        if (currentMode === 'coding' && codingSubView === 'queue') {
+          queryClient.invalidateQueries({ queryKey: ["problem_statement"] })
           queryClient.setQueryData(["problem_statement"], data)
         }
       }),
@@ -132,25 +114,37 @@ const SubscribedApp: React.FC<SubscribedAppProps> = ({
       })
     ]
     return () => cleanupFunctions.forEach((fn) => fn())
-  }, [view])
+  }, [currentMode, codingSubView, queryClient, showToast])
 
   return (
-    <div ref={containerRef} className="min-h-0">
-      {view === "queue" ? (
-        <Queue
-          setView={setView}
-          credits={credits}
-          currentLanguage={currentLanguage}
-          setLanguage={setLanguage}
-        />
-      ) : view === "solutions" ? (
-        <Solutions
-          setView={setView}
-          credits={credits}
-          currentLanguage={currentLanguage}
-          setLanguage={setLanguage}
-        />
-      ) : null}
+    <div ref={containerRef} className="min-h-0 flex flex-col flex-grow">
+      {currentMode === 'coding' && (
+        <>
+          {codingSubView === 'queue' ? (
+            <Queue
+              setCodingSubView={setCodingSubView}
+              credits={credits}
+              currentLanguage={currentLanguage}
+              setLanguage={setLanguage}
+            />
+          ) : codingSubView === 'solutions' ? (
+            <Solutions
+              setCodingSubView={setCodingSubView}
+              credits={credits}
+              currentLanguage={currentLanguage}
+              setLanguage={setLanguage}
+            />
+          ) : null}
+        </>
+      )}
+      {currentMode === 'behavioral' && (
+        <BehavioralAssistant />
+      )}
+      {currentMode === 'settings' && (
+        <div className="p-4 text-white">
+          Settings View (Coming Soon)
+        </div>
+      )}
     </div>
   )
 }

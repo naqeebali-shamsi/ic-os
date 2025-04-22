@@ -6,20 +6,22 @@
  */
 
 import { aiService } from './AIService';
-import { responseParser, DetailedSolutionData, BasicSolutionData, FourQuadrantData } from './ResponseParser';
+import { responseParser, DetailedSolutionData, BasicSolutionData, NarrativeSolutionData, ProblemExample } from './ResponseParser';
 import { BrowserWindow } from 'electron';
-import { getBruteForcePrompt, getOptimizedPrompt, getFallbackPrompt, getFourQuadrantPrompt } from '../prompts';
+import { getBruteForcePrompt, getOptimizedPrompt, getFallbackPrompt, getNarrativeSolutionPrompt } from '../prompts';
 
 export class SolutionProcessor {
   /**
-   * Generate solutions using the NEW single-prompt four-quadrant approach
+   * Generate solutions using the NEW narrative approach
    */
   public async generateSolutions(
     problemInfo: any, 
     language: string,
     mainWindow: BrowserWindow | null,
-    signal: AbortSignal
-  ): Promise<{ success: boolean, data?: FourQuadrantData | BasicSolutionData, error?: string }> {
+    signal: AbortSignal,
+    confirmedUnderstanding: string,
+    confirmedExamples: ProblemExample[]
+  ): Promise<{ success: boolean, data?: NarrativeSolutionData | BasicSolutionData, error?: string }> {
     try {
       // Update progress status
       if (mainWindow) {
@@ -29,8 +31,13 @@ export class SolutionProcessor {
         });
       }
 
-      // Get the new four-quadrant prompt
-      const { promptText, systemPrompt } = getFourQuadrantPrompt(language, problemInfo);
+      // Get the new narrative prompt, passing the confirmed data
+      const { promptText, systemPrompt } = getNarrativeSolutionPrompt(
+        language, 
+        problemInfo, 
+        confirmedUnderstanding, 
+        confirmedExamples
+      );
 
       // Call AI service with the new prompt
       const responseContent = await aiService.generateCompletion(promptText, systemPrompt, undefined, signal);
@@ -43,13 +50,13 @@ export class SolutionProcessor {
         });
       }
       
-      // Parse the response using a NEW parser function (to be created in ResponseParser.ts)
-      const parsedResult = responseParser.parseFourQuadrantResponse(responseContent);
+      // Parse the response using the NEW parser function
+      const parsedResult = responseParser.parseNarrativeResponse(responseContent);
       
       return { success: true, data: parsedResult };
 
     } catch (error) {
-      console.error("Four-quadrant solution generation error:", error);
+      console.error("Narrative solution generation error:", error);
       
       // Fall back to the standard single-prompt approach if the new one fails
       try {

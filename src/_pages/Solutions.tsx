@@ -1,9 +1,10 @@
 // Solutions.tsx
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, Fragment } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
 import { dracula } from "react-syntax-highlighter/dist/esm/styles/prism"
 import ReactMarkdown from 'react-markdown'
+import remarkBreaks from 'remark-breaks'
 // Import Card components from shadcn/ui
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card" 
 import { Button } from "@/components/ui/button"
@@ -17,7 +18,7 @@ import Debug from "./Debug"
 import { useToast } from "../contexts/toast"
 import { COMMAND_KEY } from "../utils/platform"
 // Import the new data type
-import { FourQuadrantData } from "../../electron/ResponseParser" // Adjust path if necessary
+import { NarrativeSolutionData, BasicSolutionData, ProblemUnderstandingData, ProblemExample } from "../../electron/ResponseParser" // Adjust path if necessary
 
 export const ContentSection = ({
   title,
@@ -271,95 +272,122 @@ const extractDryRunSectionFromMarkdown = (markdown: string): string => {
   return "```\n" + markdown.substring(0, 2000) + "\n... (truncated)\n```";
 }
 
-// --- Reusable Quadrant Component --- 
-const QuadrantCard = ({
+// --- Reusable Display Components (Simplified/Adapted for Narrative Flow) ---
+
+// Generic Section Component
+const SectionCard = ({
   title,
-  content,
+  children,
   isLoading,
-  isCode = false,
-  language = 'text'
+  loadingText
 }: {
   title: string
-  content: string | null | undefined
+  children: React.ReactNode
   isLoading: boolean
-  isCode?: boolean
-  language?: string
+  loadingText?: string
+}) => (
+  <Card className="bg-card/70 border-border/40 flex flex-col">
+    <CardHeader className="p-3 border-b border-border/20">
+      <CardTitle className="text-sm font-bold text-foreground tracking-tight">
+        {title}
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="p-4 overflow-y-auto">
+      {isLoading ? (
+        <p className="text-xs bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-clip-text text-transparent animate-pulse">
+          {loadingText || `Loading ${title.toLowerCase()}...`}
+        </p>
+      ) : (
+        children
+      )}
+    </CardContent>
+  </Card>
+)
+
+// Markdown Content Display
+const MarkdownContent = ({ content }: { content: string | undefined | null }) => {
+  if (!content) return <p className="text-sm text-muted-foreground">Not available.</p>;
+
+  // Explicitly replace literal \n with actual newlines
+  const formattedContent = content.replace(/\\n/g, '\n');
+
+  return (
+    <div className="text-[13px] leading-[1.4] text-foreground prose prose-sm prose-invert max-w-none">
+      {/* Pass the formatted content to ReactMarkdown */}
+      {/* Keep remark-breaks plugin as it might handle other cases */}
+      <ReactMarkdown remarkPlugins={[remarkBreaks]}>{formattedContent}</ReactMarkdown>
+    </div>
+  )
+}
+
+// Code Display with Copy Button
+const CodeBlock = ({
+  code,
+  language
+}: {
+  code: string | undefined | null
+  language: string
 }) => {
   const [copied, setCopied] = useState(false)
 
   const copyToClipboard = () => {
-    if (typeof content === "string" && content) {
-      navigator.clipboard.writeText(content).then(() => {
+    if (code) {
+      // Replace literal \n with actual newlines before copying too?
+      const codeToCopy = code.replace(/\\n/g, '\n');
+      navigator.clipboard.writeText(codeToCopy).then(() => {
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
       })
     }
   }
 
-  const renderContent = () => {
-    if (isLoading) {
-      return (
-        <p className="text-xs bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 bg-clip-text text-transparent animate-pulse">
-          Loading {title.toLowerCase()}...
-        </p>
-      )
-    }
-    if (!content) {
-      return <p className="text-sm text-gray-400">No {title.toLowerCase()} available.</p>
-    }
-    if (isCode) {
-      return (
-        <div className="relative w-full">
-          <button
-            onClick={copyToClipboard}
-            className="absolute top-2 right-2 text-xs text-foreground bg-black/10 hover:bg-black/20 rounded px-2 py-1 transition z-10"
-            disabled={!content}
-          >
-            {copied ? "Copied!" : "Copy"}
-          </button>
-          <SyntaxHighlighter
-            showLineNumbers
-            language={language === "golang" ? "go" : language}
-            style={dracula}
-            customStyle={{
-              maxWidth: "100%",
-              margin: 0,
-              padding: "1rem",
-              paddingTop: "2.5rem", // Add padding top to avoid overlap with button
-              fontSize: "13px",
-              lineHeight: "1.4",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-              backgroundColor: "rgba(22, 27, 34, 0.5)",
-              borderRadius: "0.375rem" // Match card border radius
-            }}
-            wrapLongLines={true}
-          >
-            {content as string}
-          </SyntaxHighlighter>
-        </div>
-      )
-    } else {
-      return (
-        <div className="text-[13px] leading-[1.4] text-foreground prose prose-sm prose-invert max-w-none">
-          <ReactMarkdown>{content}</ReactMarkdown>
-        </div>
-      )
-    }
-  }
+  if (!code) return <p className="text-sm text-muted-foreground">Code not available.</p>;
+
+  // Replace literal \n with actual newlines for display
+  const formattedCode = code.replace(/\\n/g, '\n');
 
   return (
-    <Card className="bg-card/70 border-border/40 flex flex-col h-full">
-      <CardHeader className="p-3">
-        <CardTitle className="text-sm font-bold text-foreground tracking-tight">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex-grow overflow-y-auto p-4">
-        {renderContent()}
-      </CardContent>
-    </Card>
+    <div className="relative w-full">
+      <button
+        onClick={copyToClipboard}
+        className="absolute top-2 right-2 text-xs text-foreground bg-black/10 hover:bg-black/20 rounded px-2 py-1 transition z-10"
+        disabled={!code}
+      >
+        {copied ? "Copied!" : "Copy"}
+      </button>
+      <SyntaxHighlighter
+        showLineNumbers
+        language={language === "golang" ? "go" : language}
+        style={dracula}
+        customStyle={{
+          maxWidth: "100%",
+          margin: 0,
+          padding: "1rem",
+          paddingTop: "2.5rem",
+          fontSize: "13px",
+          lineHeight: "1.4",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-all",
+          backgroundColor: "rgba(22, 27, 34, 0.5)",
+          borderRadius: "0.375rem"
+        }}
+        wrapLongLines={true}
+      >
+        {formattedCode}
+      </SyntaxHighlighter>
+    </div>
   )
+}
+
+// Complexity Pair Display
+const ComplexityPair = ({ time, space }: { time: string | undefined | null, space: string | undefined | null }) => {
+    if (!time && !space) return <p className="text-sm text-muted-foreground">Complexity not available.</p>;
+    return (
+        <div className="space-y-2 text-[13px] leading-[1.4] text-foreground">
+            {time && <div><strong>Time:</strong> {time}</div>}
+            {space && <div><strong>Space:</strong> {space}</div>}
+        </div>
+    )
 }
 
 // --- Main Solutions Component --- 
@@ -370,6 +398,9 @@ export interface SolutionsProps {
   setLanguage: (language: string) => void
 }
 
+// Define type for the optimal implementation part to store history
+type OptimalImplementationHistory = { code: string; dryRun: string };
+
 const Solutions: React.FC<SolutionsProps> = ({
   setView,
   credits,
@@ -378,145 +409,204 @@ const Solutions: React.FC<SolutionsProps> = ({
 }) => {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
-  const [solutionData, setSolutionData] = useState<FourQuadrantData | null>(null)
-  const [isLoading, setIsLoading] = useState(true) // Start loading initially
-  const [problemStatement, setProblemStatement] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("problem")
-  const [rawAiResponse, setRawAiResponse] = useState<string | null>(null) // Store raw response
-  const [followUpQuestion, setFollowUpQuestion] = useState("") // State for follow-up input
-  const [isFollowUpLoading, setIsFollowUpLoading] = useState(false) // Loading state for follow-up
-  const [followUpAnswer, setFollowUpAnswer] = useState<string | null>(null) // State for follow-up answer
-  const latestJobIdRef = useRef<string | null>(null) // Ref to track the latest job ID
-  
-  // Use refs to keep track of listeners to prevent duplicates
+  // State for the main narrative solution data
+  const [solutionData, setSolutionData] = useState<NarrativeSolutionData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  // State to hold history of optimal implementations (initial + follow-ups)
+  const [optimalHistory, setOptimalHistory] = useState<OptimalImplementationHistory[]>([])
+  const [followUpQuestion, setFollowUpQuestion] = useState("")
+  const [isFollowUpLoading, setIsFollowUpLoading] = useState(false)
+  const [followUpError, setFollowUpError] = useState<string | null>(null); // State for follow-up errors
+  // Two-step flow state
+  const [problemInfo, setProblemInfo] = useState<any>(null)
+  const [viewStage, setViewStage] = useState<'loading'|'awaiting_confirmation'|'solving'|'solution_displayed'|'error'>('loading')
+  const [understandingData, setUnderstandingData] = useState<ProblemUnderstandingData | null>(null)
+  const [userClarification, setUserClarification] = useState<string>('')
+  const [clarificationError, setClarificationError] = useState<string | null>(null)
+
+  // Use refs to keep track of listeners
   const listenersAttached = useRef(false)
   const solutionListenerCleanup = useRef<(() => void) | null>(null)
-  const problemListenerCleanup = useRef<(() => void) | null>(null)
   const errorListenerCleanup = useRef<(() => void) | null>(null)
   const statusListenerCleanup = useRef<(() => void) | null>(null)
 
-  // Fetch initial data (like problem statement if available) and set up listeners
+  // Effect to set up IPC listeners
   useEffect(() => {
-    
-    // Function to fetch initial problem statement
-    const fetchInitialProblemStatement = async () => {
-       const initialProblemData = await queryClient.getQueryData<any>(["problem_statement"])
-       if (initialProblemData && initialProblemData.problem_statement) {
-          setProblemStatement(initialProblemData.problem_statement)
-       }
-    }
-    fetchInitialProblemStatement()
-    
-    // Only attach listeners once
     if (!listenersAttached.current) {
-        console.log("Attaching IPC listeners for Solutions view");
-        
-        solutionListenerCleanup.current = window.electronAPI.onSolutionSuccess((data: FourQuadrantData) => {
-          console.log("Received SOLUTION_SUCCESS data:", data);
-          setSolutionData(data)
-          setIsLoading(false)
-          // Optionally update query cache if needed, but useState is primary for this view now
-          // queryClient.setQueryData(['solution'], data); 
-        });
+      console.log("Attaching IPC listeners for Solutions view (Narrative)");
 
-        problemListenerCleanup.current = window.electronAPI.onProblemExtracted((data: any) => {
-            // This might still be useful for showing problem statement before solution arrives
-            if (data && data.problem_statement) {
-              setProblemStatement(data.problem_statement)
-              queryClient.setQueryData(["problem_statement"], data)
-            }
-        });
+      solutionListenerCleanup.current = window.electronAPI.onSolutionSuccess((data: NarrativeSolutionData | BasicSolutionData) => {
+        console.log("Received SOLUTION_SUCCESS data (Narrative Check):", data);
+        // Type guard to ensure it's NarrativeSolutionData
+        if (data && 'problemAnalysis' in data && 'optimalImplementation' in data) { 
+          setSolutionData(data) 
+          // Initialize history with the first optimal implementation
+          setOptimalHistory([data.optimalImplementation]) 
+          setIsLoading(false) 
+        } else {
+           // Handle case where fallback BasicSolutionData might be received, or unexpected structure
+           console.warn("Received solution data is not in Narrative format. Displaying basic info or fallback.");
+           // Potentially set a different state or show a simplified view
+           setIsLoading(false); // Still stop loading
+           // Maybe show a message or fallback UI here based on `BasicSolutionData`
+        }
+      });
 
-        errorListenerCleanup.current = window.electronAPI.onSolutionError((error: string) => {
-            console.error("Received SOLUTION_ERROR:", error);
-            showToast("Solution Error", error, "error")
-            setIsLoading(false) // Stop loading on error
-            setView("queue") // Go back to queue on error maybe?
-        });
+      errorListenerCleanup.current = window.electronAPI.onSolutionError((error: string) => {
+        console.error("Received SOLUTION_ERROR:", error);
+        showToast("Solution Error", error, "error")
+        setIsLoading(false)
+        // Consider navigating back or showing error state
+        // setView("queue") 
+      });
 
-        statusListenerCleanup.current = window.electronAPI.onProcessingStatus((status: any) => {
-            console.log("Processing Status:", status);
-            // Potentially display status message somewhere?
-            // For now, just ensure loading state is true if we receive a start message
-            if (!solutionData) { // Only set loading if we don't have data yet
-                 setIsLoading(true);
-            }
-        });
-        
-        listenersAttached.current = true;
+      statusListenerCleanup.current = window.electronAPI.onProcessingStatus((status: any) => {
+        console.log("Processing Status:", status);
+        if (!solutionData && optimalHistory.length === 0) { // Only set loading if no data AND no history yet
+          setIsLoading(true);
+        }
+      });
+
+      // NEW: listen for problem info extraction
+      window.electronAPI.onProblemExtracted((info: any) => {
+        console.log('Problem info extracted:', info)
+        setProblemInfo(info)
+      })
+      // NEW: listen for initial understanding data
+      window.electronAPI.onUnderstandingGenerated((data: ProblemUnderstandingData) => {
+        console.log('Received initial understanding:', data)
+        setUnderstandingData(data)
+        setViewStage('awaiting_confirmation')
+        setIsLoading(false)
+      })
+      // NEW: listen for direct solution success (skip flow)
+      window.electronAPI.onSolutionSuccess((data: NarrativeSolutionData | BasicSolutionData) => {
+        console.log('Received full solution via skip flow:', data)
+        setSolutionData(data as NarrativeSolutionData)
+        if ((data as NarrativeSolutionData).optimalImplementation) {
+          setOptimalHistory([(data as NarrativeSolutionData).optimalImplementation])
+        }
+        setViewStage('solution_displayed')
+        setIsLoading(false)
+      })
+
+      listenersAttached.current = true;
     }
 
-    // Cleanup function
     return () => {
       if (listenersAttached.current) {
-         console.log("Cleaning up IPC listeners for Solutions view");
-         solutionListenerCleanup.current?.();
-         problemListenerCleanup.current?.();
-         errorListenerCleanup.current?.();
-         statusListenerCleanup.current?.();
-         listenersAttached.current = false; // Reset flag on unmount
+        console.log("Cleaning up IPC listeners for Solutions view (Narrative)");
+        solutionListenerCleanup.current?.();
+        errorListenerCleanup.current?.();
+        statusListenerCleanup.current?.();
+        listenersAttached.current = false;
       }
     }
-    // Rerun only if dependencies like setView change (which they shouldn't often)
-  }, [queryClient, showToast, setView]); 
+  }, [showToast, solutionData, optimalHistory.length]); // Add dependencies
 
-  // ... (rest of the component, like handleRunDebug, etc.)
-  const handleRunDebug = () => {
-    window.electronAPI.runDebug()
-  }
-  
-  const handleBackToQueue = () => {
-    setView("queue")
-    window.electronAPI.cancelOngoingRequests() // Cancel if going back
-  }
-
+  // Follow-up question handling
   const handleFollowUpSubmit = async () => {
+    if (!solutionData) return; // Need initial solution data
     console.log("Follow-up submitted:", followUpQuestion);
-    setFollowUpAnswer(null); // Clear previous answer
+    setFollowUpError(null); // Clear previous error
     setIsFollowUpLoading(true);
 
     try {
+      // We need a way to pass context. Passing the previous optimal implementation for now.
+      // Ideally, the backend handles context better (e.g., conversation history)
+      const previousOptimal = optimalHistory[optimalHistory.length - 1];
+      
+      // *** TODO: Update IPC call if needed ***
+      // Assume processFollowUpQuestion now takes previous context and returns 
+      // { success: boolean, data?: OptimalImplementationHistory, error?: string }
       const result = await window.electronAPI.processFollowUpQuestion({
-        previousResponse: rawAiResponse, // Pass the raw response as context
+        previousOptimalCode: previousOptimal?.code || "",
+        previousOptimalDryRun: previousOptimal?.dryRun || "",
+        problemAnalysis: solutionData.problemAnalysis,
         question: followUpQuestion,
         language: currentLanguage
       });
 
       console.log("Follow-up response received:", result);
 
-      if (result && result.answer) {
-        setFollowUpAnswer(result.answer);
+      if (result && result.success && result.data) {
+        // Append the new optimal implementation to history
+        setOptimalHistory(prev => [...prev, result.data!]); 
+        setFollowUpQuestion(""); // Clear input on success
       } else if (result && result.error) {
-        showToast({
-          title: "Follow-up Error",
-          message: result.error,
-          type: "error"
-        });
+        setFollowUpError(result.error);
+        showToast("Follow-up Error", result.error, "error");
       } else {
-         showToast({
-          title: "Follow-up Error",
-          message: "Received an unexpected response from the backend.",
-          type: "error"
-        });
+         const errorMsg = "Received an unexpected response for follow-up.";
+         setFollowUpError(errorMsg);
+         showToast("Follow-up Error", errorMsg, "error");
       }
     } catch (error: any) {
       console.error("Error calling processFollowUpQuestion:", error);
-      showToast({
-        title: "Follow-up Request Failed",
-        message: error.message || "An unknown error occurred.",
-        type: "error"
-      });
+      const errorMsg = error.message || "An unknown error occurred during follow-up.";
+      setFollowUpError(errorMsg);
+      showToast("Follow-up Request Failed", errorMsg, "error");
     } finally {
       setIsFollowUpLoading(false);
     }
   };
 
-  // Early return if no data yet AND not loading - represents an empty initial state or error state where nothing loaded
-  if (!solutionData && !isLoading) {
-    // This block should probably show a specific message like "Waiting for processing..." or handle the error case explicitly.
-    // For now, returning a minimal structure or null might be okay, but the main content shouldn't be here.
-    // Let's just return the header and a placeholder message.
-     return (
+  // Back to queue handler
+  const handleBackToQueue = () => {
+    setView("queue")
+    window.electronAPI.cancelOngoingRequests() // Cancel if going back
+  }
+
+  // Handlers for confirmation and clarification
+  const handleConfirm = async () => {
+    if (!understandingData || !problemInfo) return
+    setViewStage('solving')
+    // Trigger full solution generation
+    try {
+      const sol: NarrativeSolutionData = await window.electronAPI.triggerSolutionGeneration({
+        problemInfo,
+        confirmedUnderstanding: understandingData.understandingStatement,
+        confirmedExamples: understandingData.generatedExamples,
+        language: currentLanguage
+      })
+      setSolutionData(sol)
+      setOptimalHistory([sol.optimalImplementation])
+      setViewStage('solution_displayed')
+    } catch (err: any) {
+      console.error('Error generating solution after confirm:', err)
+      setViewStage('error')
+    }
+  }
+
+  const handleClarify = async () => {
+    if (!understandingData || !problemInfo) return
+    if (!userClarification.trim()) {
+      setClarificationError('Please provide clarification before submitting')
+      return
+    }
+    setClarificationError(null)
+    setViewStage('loading')
+    try {
+      const refined: ProblemUnderstandingData = await window.electronAPI.submitUserClarification({
+        problemInfo,
+        previousUnderstanding: understandingData.understandingStatement,
+        previousExamples: understandingData.generatedExamples,
+        previousQuestions: understandingData.clarifyingQuestions,
+        userClarification
+      })
+      setUnderstandingData(refined)
+      setUserClarification('')
+      setViewStage('awaiting_confirmation')
+    } catch (err: any) {
+      console.error('Error refining understanding:', err)
+      setClarificationError(err.message || 'Clarification failed')
+      setViewStage('awaiting_confirmation')
+    }
+  }
+
+  // Render based on current stage
+  if (viewStage === 'loading') {
+    return (
       <div className="p-4 bg-transparent space-y-4 flex flex-col max-h-screen overflow-y-auto">
         <SolutionCommands
           setView={setView}
@@ -524,117 +614,164 @@ const Solutions: React.FC<SolutionsProps> = ({
           currentLanguage={currentLanguage}
           setLanguage={setLanguage}
           onBack={handleBackToQueue}
-          onDebug={handleRunDebug} // Debug might not make sense here
+          onDebug={() => {}} // Debug might need context
         />
         <div className="flex-grow flex items-center justify-center">
-           <p className="text-gray-400">Waiting for solution data...</p> 
+          <p className="text-gray-400 animate-pulse">Processing problem...</p>
         </div>
       </div>
-     );
-  } // End of early return
+    )
+  }
+  if (viewStage === 'awaiting_confirmation' && understandingData) {
+    return (
+      <div className="p-4 bg-transparent space-y-6 flex flex-col max-h-screen overflow-y-auto pb-48">
+        <SolutionCommands setView={setView} credits={credits} currentLanguage={currentLanguage} setLanguage={setLanguage} onBack={handleBackToQueue} onDebug={() => {}} />
+        <SectionCard title="Confirm Problem Understanding" isLoading={false}>
+          <MarkdownContent content={understandingData.understandingStatement} />
+          {understandingData.generatedExamples.map((ex: ProblemExample, idx) => (
+            <div key={idx} className="mt-4 space-y-2">
+              <h3 className="text-sm font-semibold">Example {idx + 1}:</h3>
+              <MarkdownContent content={`**Input:** ${ex.input}`} />
+              <MarkdownContent content={`**Output:** ${ex.output}`} />
+              {ex.explanation && <MarkdownContent content={ex.explanation} />}
+            </div>
+          ))}
+          {understandingData.clarifyingQuestions.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold">Clarifying Questions:</h3>
+              <ul className="list-disc list-inside">
+                {understandingData.clarifyingQuestions.map((q, i) => <li key={i}>{q}</li>)}
+              </ul>
+            </div>
+          )}
+          <div className="mt-6 space-y-3">
+            <Textarea placeholder="Enter clarifications or corrections..." value={userClarification} onChange={e => setUserClarification(e.target.value)} rows={3} />
+            {clarificationError && <p className="text-xs text-red-400">{clarificationError}</p>}
+            <div className="flex gap-2">
+              <Button variant="destructive" onClick={handleClarify} disabled={viewStage === 'loading'}>Submit Clarification</Button>
+              <Button variant="success" onClick={handleConfirm} disabled={viewStage === 'loading'}>Confirm & Proceed</Button>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+    )
+  }
+  if (viewStage === 'error') {
+    return (
+      <div className="p-4 flex-grow flex items-center justify-center">
+        <p className="text-red-400">An error occurred. Please try again.</p>
+      </div>
+    )
+  }
 
-  // Main component render logic when loading OR when solutionData is available
+  // Final solution display
+  if (!solutionData) {
+    return (
+      <div className="p-4 bg-transparent space-y-4 flex flex-col max-h-screen overflow-y-auto">
+          <SolutionCommands
+             setView={setView}
+             credits={credits}
+             currentLanguage={currentLanguage}
+             setLanguage={setLanguage}
+             onBack={handleBackToQueue}
+             onDebug={() => {}} // Debug might need context
+          />
+        <div className="flex-grow flex items-center justify-center">
+          <p className="text-red-400">Failed to load solution data or received incompatible format.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Main Render - Narrative Flow
   return (
-    <div className="p-4 bg-transparent space-y-4 flex flex-col max-h-screen overflow-y-auto">
-      {/* Header/Commands Section */}
+    <div className="p-4 bg-transparent space-y-6 flex flex-col max-h-screen overflow-y-auto pb-48">
+      {/* Header/Commands Section */} 
       <SolutionCommands
         setView={setView}
         credits={credits}
         currentLanguage={currentLanguage}
         setLanguage={setLanguage}
         onBack={handleBackToQueue}
-        onDebug={handleRunDebug}
+        onDebug={() => window.electronAPI.runDebug()} // Assuming debug uses current state
       />
 
-      {/* Vertical Section Layout */}
-      <div className="flex flex-col gap-4"> {/* Changed from grid to flex-col */}
-        {/* Section 1: Problem Understanding */}
-        <QuadrantCard 
-          title="1. Problem Understanding" 
-          content={solutionData?.problemUnderstanding} 
-          isLoading={isLoading}
-        />
+      {/* Narrative Sections */} 
+      <SectionCard title="1. Problem Analysis" isLoading={false}>
+        <MarkdownContent content={solutionData.problemAnalysis} />
+      </SectionCard>
 
-        {/* Section 2: Brute Force Approach */}
-        <QuadrantCard 
-          title="2. Brute Force Approach" 
-          content={solutionData?.bruteForceApproach} 
-          isLoading={isLoading}
-        />
-
-        {/* Section 3: Optimal Solution Pseudocode */}
-        <QuadrantCard 
-          title="3. Optimal Solution Pseudocode" 
-          content={solutionData?.optimalSolutionPseudocode} 
-          isLoading={isLoading}
-        />
-
-        {/* Section 4: Optimal Solution Code */}
-        <QuadrantCard
-          title="4. Optimal Solution Code"
-          content={solutionData?.optimalSolutionImplementation?.code}
-          isLoading={isLoading}
-          isCode={true}
-          language={currentLanguage}
-        />
-      </div>
-      
-       {/* Optional: Display Complexity and Thinking Process below the main sections */}
-       {!isLoading && solutionData?.optimalSolutionImplementation && (
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-700">
-                 <QuadrantCard
-                    title="Optimal Time/Space Complexity"
-                    isLoading={false}
-                    content={`**Time:** ${solutionData.optimalSolutionImplementation.timeComplexity || 'N/A'}\n**Space:** ${solutionData.optimalSolutionImplementation.spaceComplexity || 'N/A'}`}
-                 />
-                 <QuadrantCard
-                    title="Thinking Process & Constraints"
-                    isLoading={false}
-                    content={solutionData.optimalSolutionImplementation.thinkingProcess}
-                 />
-            </div>
-       )}
-
-      {/* Keep ScreenshotQueue for debugging? Or remove? */}
-      {/* <div className="mt-4 border-t border-gray-700 pt-4">
-        <h3 className="text-sm font-medium text-white mb-2">Screenshot Queue (Debug View)</h3>
-        <ScreenshotQueue view="solutions" setView={setView} />
-      </div> */}
-      
-      {/* Follow-up Question Section - Now correctly placed in the main return block */}
-      {solutionData && !isLoading && (
-        <div className="mt-6 p-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-lg border border-slate-700 shadow-lg">
-          <h3 className="text-lg font-semibold text-white mb-3">Ask a Follow-up Question</h3>
-          <Textarea
-            placeholder="Type your question about the solution here..."
-            value={followUpQuestion}
-            onChange={(e) => setFollowUpQuestion(e.target.value)}
-            className="bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500 mb-3"
-            rows={3}
+      <SectionCard title="2. Brute Force Approach" isLoading={false}>
+        <div className="space-y-3">
+          <MarkdownContent content={solutionData.bruteForce.explanation} />
+          <CodeBlock code={solutionData.bruteForce.codeOrPseudocode} language={currentLanguage} />
+          <ComplexityPair
+             time={solutionData.bruteForce.timeComplexity}
+             space={solutionData.bruteForce.spaceComplexity}
           />
-          <Button
-            onClick={handleFollowUpSubmit}
-            disabled={!followUpQuestion.trim() || isFollowUpLoading} // Disable during loading too
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-          >
-            {isFollowUpLoading ? "Submitting..." : "Submit Follow-up"}
-          </Button>
+          <MarkdownContent content={solutionData.bruteForce.inefficiencyReason} />
         </div>
-      )}
-      
-      {/* Follow-up Answer Section - Now correctly placed */}
-      {isFollowUpLoading && (
-        <div className="mt-4 p-4 bg-slate-800 rounded-lg border border-slate-700"><p className="text-sm text-gray-300 animate-pulse">Getting answer...</p></div>
-      )}
-      {followUpAnswer && !isFollowUpLoading && (
-        <div className="mt-4 p-4 bg-gradient-to-br from-slate-800 to-slate-700 rounded-lg border border-slate-600 shadow-inner">
-           <h4 className="text-md font-semibold text-white mb-2">Follow-up Answer:</h4>
-           <div className="text-[13px] leading-[1.4] text-gray-100 prose prose-sm prose-invert max-w-none"><ReactMarkdown>{followUpAnswer}</ReactMarkdown></div>
-        </div>
-      )}
+      </SectionCard>
 
-    </div>
-  )
+      <SectionCard title="3. Optimization Strategy" isLoading={false}>
+         <div className="space-y-3">
+             <MarkdownContent content={solutionData.optimizationStrategy.explanation} />
+             <CodeBlock code={solutionData.optimizationStrategy.pseudocode} language="text" />
+             <ComplexityPair
+                 time={solutionData.optimizationStrategy.timeComplexity}
+                 space={solutionData.optimizationStrategy.spaceComplexity}
+             />
+         </div>
+      </SectionCard>
+      
+      {/* Optimal Implementation & Dry Run History */} 
+      <SectionCard
+         title={`4. Optimal Implementation & Dry Run (${currentLanguage})`}
+         isLoading={false}
+      >
+         <div className="space-y-4">
+            {optimalHistory.map((impl, index) => (
+               <Fragment key={index}>
+                  {index > 0 && (
+                    <div className="pt-4 mt-4 border-t border-border/30">
+                       <p className="text-xs text-muted-foreground mb-2">Update based on follow-up #{index}:</p>
+                    </div>
+                  )}
+                  <h3 className="text-sm font-semibold text-foreground">Implementation #{index + 1}:</h3>
+                  <CodeBlock code={impl.code} language={currentLanguage} />
+                  <h3 className="text-sm font-semibold text-foreground mt-3">Dry Run #{index + 1}:</h3>
+                  <div className="whitespace-pre-wrap">
+                     <MarkdownContent content={impl.dryRun} />
+                  </div>
+               </Fragment>
+            ))}
+         </div>
+      </SectionCard>
+
+      {/* Follow-up Question Section (Sticky at Bottom) */}
+      <div className="mt-4 p-4 bg-gradient-to-br from-slate-900/80 to-slate-800/80 rounded-lg border border-slate-700/50 shadow-lg sticky bottom-0 backdrop-blur-sm z-10">
+        <h3 className="text-base font-semibold text-foreground mb-3">Ask a Follow-up Question</h3>
+        <Textarea
+          placeholder="Ask about the optimal solution, request modifications, etc..."
+          value={followUpQuestion}
+          onChange={(e) => setFollowUpQuestion(e.target.value)}
+          className="bg-slate-800 border-slate-600 text-white placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500 mb-3"
+          rows={3}
+        />
+        <Button
+          onClick={handleFollowUpSubmit}
+          disabled={!followUpQuestion.trim() || isFollowUpLoading}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+        >
+          {isFollowUpLoading ? "Submitting..." : "Submit Follow-up"}
+        </Button>
+        {followUpError && (
+           <p className="text-xs text-red-400 mt-2">Error: {followUpError}</p>
+        )}
+      </div>
+
+    </div> // End main container
+  );
 }
 
-export default Solutions
+export default Solutions;

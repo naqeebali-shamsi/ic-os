@@ -38,3 +38,37 @@
 *   Cross-platform (Windows, macOS, Linux).
 *   Specific configurations/permissions needed (macOS screen recording, script execution).
 *   macOS/Linux requires script execution permissions (`chmod +x`
+
+## Architecture & Key Components
+
+*   **Framework:** Electron (Main Process + Renderer Process)
+*   **Renderer:** React (using Vite), TypeScript, Tailwind CSS, Shadcn UI
+*   **Main Process:** Node.js (Electron environment), TypeScript
+*   **State Management (Renderer):** React state (`useState`, `useRef`), TanStack Query (for server state/async ops like fetching screenshots).
+*   **Configuration:** `electron-store` for persistent settings (API keys, model choice, language, opacity). Managed by `ConfigHelper.ts`.
+*   **AI Interaction:** Centralized in `AIService.ts` supporting multiple providers (OpenAI, Gemini, Anthropic). Uses `axios` for Gemini, official SDKs for OpenAI/Anthropic.
+*   **Core Logic:**
+    *   `ScreenshotHelper.ts`: Handles taking screenshots (platform-specific logic).
+    *   `ProcessingHelper.ts`: Orchestrates the flow from screenshots to solution/debug analysis, manages abort controllers.
+    *   `SolutionProcessor.ts`: Generates coding solutions using prompts from `prompts.ts`.
+    *   `ResponseParser.ts`: Parses structured (JSON) and semi-structured (Markdown) responses from AI models.
+    *   `ShortcutsHelper.ts`: Manages global keyboard shortcuts.
+*   **UI Components:** Reusable components in `src/components/` (e.g., `SolutionCommands`, `ScreenshotQueue`, `SettingsDialog`). Pages/Views in `src/_pages/`.
+*   **Main/Renderer Communication Bridge:** `electron/preload.ts` (exposes `window.electronAPI`), `electron/ipcHandlers.ts` (defines handlers).
+*   **Styling:** Tailwind CSS utility classes, `components.json` for Shadcn UI theme.
+*   **Build/Dev:** Vite for renderer HMR, `electron-builder` inferred from `package.json` for packaging.
+*   **Auto-Update:** Uses `electron-updater` integrated in `autoUpdater.ts`.
+
+## Planned Additions (Behavioral Feature)
+
+*   **Data:**
+    *   `src/data/amazon_lps.json`: Static list of Amazon Leadership Principles.
+    *   `src/data/behavioral_stories.json`: User-provided STAR stories tagged with LPs.
+*   **UI:**
+    *   New state variable for `currentMode` (`coding` | `behavioral` | `settings`).
+    *   New component: `src/pages/BehavioralAssistant.tsx`.
+*   **Backend:**
+    *   New IPC channel: `process-behavioral-question`.
+    *   Handler will involve multiple sequential `AIService` calls (LP extraction, Story selection, Story generation fallback).
+*   **State Management:** Add `currentMode` state to control view rendering.
+*   **Shortcuts:** Add new global shortcut to switch to `behavioral` mode.

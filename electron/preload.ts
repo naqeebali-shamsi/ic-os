@@ -1,5 +1,6 @@
 console.log("Preload script starting...")
 import { contextBridge, ipcRenderer } from "electron"
+import type { ViewMode } from "../src/types/electron.d.ts"; // Import the type
 const { shell } = require("electron")
 
 export const PROCESSING_EVENTS = {
@@ -244,10 +245,61 @@ const electronAPI = {
     }
   },
   deleteLastScreenshot: () => ipcRenderer.invoke("delete-last-screenshot"),
+  cancelOngoingRequests: () => ipcRenderer.invoke("cancel-ongoing-requests"),
 
   // NEW: Function to handle follow-up questions
-  processFollowUpQuestion: (context: { previousResponse: string | null, question: string, language: string }) => 
-    ipcRenderer.invoke("process-follow-up-question", context)
+  processFollowUpQuestion: (args: any) => 
+    ipcRenderer.invoke("process-follow-up-question", args),
+
+  // NEW: View mode switching
+  onSetViewMode: (callback: (mode: ViewMode) => void) => {
+    const subscription = (_: any, mode: ViewMode) => callback(mode);
+    ipcRenderer.on('set-view-mode', subscription);
+    return () => {
+      ipcRenderer.removeListener('set-view-mode', subscription);
+    };
+  },
+  
+  // New methods for two-step confirmation
+  submitUserClarification: (clarification: string) => 
+    ipcRenderer.invoke("submit-user-clarification", clarification),
+  triggerSolutionGeneration: () => 
+    ipcRenderer.invoke("trigger-solution-generation"),
+  onUnderstandingGenerated: (callback: (understanding: string) => void) => {
+    const subscription = (_: any, data: any) => callback(data)
+    ipcRenderer.on("understanding-generated", subscription)
+    return () => {
+      ipcRenderer.removeListener("understanding-generated", subscription)
+    }
+  },
+
+  // NEW: Behavioral Question Processing
+  processBehavioralQuestion: (question: string) => 
+    ipcRenderer.invoke("process-behavioral-question", question),
+    
+  // NEW: Behavioral Follow-up Processing
+  processBehavioralFollowUp: (args: {
+    originalQuestion: string;
+    selectedStory: any; // Consider defining a shared type
+    followUpQuestion: string;
+  }) => ipcRenderer.invoke("process-behavioral-follow-up", args),
+
+  // NEW: Generate Anticipated Follow-ups
+  generateAnticipatedFollowUps: (args: {
+    originalQuestion: string;
+    selectedStory: any; // Consider defining a shared type
+  }) => ipcRenderer.invoke("generate-anticipated-follow-ups", args),
+
+  // NEW: Generate Behavioral Story Detail
+  generateBehavioralStoryDetail: (storyId: string) => ipcRenderer.invoke('generate-behavioral-story-detail', storyId),
+
+  // Listeners (no changes needed here for invoke)
+  on: (channel: string, func: (...args: any[]) => void): (() => void) => {
+    ipcRenderer.on(channel, func)
+    return () => {
+      ipcRenderer.removeListener(channel, func)
+    }
+  },
 }
 
 // Before exposing the API
@@ -256,10 +308,23 @@ console.log(
   Object.keys(electronAPI)
 )
 
-// Expose the API
-contextBridge.exposeInMainWorld("electronAPI", electronAPI)
+console.log("Context Isolation enabled:", process.contextIsolated)
 
-console.log("electronAPI exposed to window")
+if (process.contextIsolated) {
+  try {
+    console.log("Exposing electronAPI to window...")
+    contextBridge.exposeInMainWorld("electronAPI", electronAPI)
+    console.log("electronAPI exposed successfully.")
+  } catch (error) {
+    console.error("Failed to expose electronAPI:", error)
+  }
+} else {
+  console.warn("Context Isolation is disabled. electronAPI will be attached directly to window object.")
+  // @ts-ignore (Assignment to window is risky without context isolation)
+  window.electronAPI = electronAPI
+}
+
+console.log("Preload script finished.")
 
 // Add this focus restoration handler
 ipcRenderer.on("restore-focus", () => {

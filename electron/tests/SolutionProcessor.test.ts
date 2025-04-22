@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { solutionProcessor } from '../SolutionProcessor';
 import { aiService } from '../AIService';
-import { responseParser, BasicSolutionData, DetailedSolutionData, FourQuadrantData } from '../ResponseParser';
+import { responseParser, BasicSolutionData, DetailedSolutionData, NarrativeSolutionData, ProblemExample } from '../ResponseParser';
 import { BrowserWindow } from 'electron';
+import { getNarrativeSolutionPrompt, getFallbackPrompt } from '../../prompts';
 
 // Mock dependencies
 vi.mock('../AIService', () => ({
@@ -13,24 +14,32 @@ vi.mock('../AIService', () => ({
 
 vi.mock('../ResponseParser', () => ({
   responseParser: {
-    parseBruteForceResponse: vi.fn(),
-    parseOptimizedResponse: vi.fn(),
     parseStandardSolutionResponse: vi.fn(),
-    parseFourQuadrantResponse: vi.fn()
+    parseNarrativeResponse: vi.fn()
   }
 }));
 
+// Mock the prompt function
+vi.mock('../../prompts', async (importOriginal) => {
+  const actual = await importOriginal() as any; // Import actual module
+  return {
+    getNarrativeSolutionPrompt: vi.fn(),
+    getFallbackPrompt: vi.fn(),
+  };
+});
+
 // Type guards
-function isDetailedSolution(data: BasicSolutionData | DetailedSolutionData | FourQuadrantData): data is DetailedSolutionData {
+function isDetailedSolution(data: BasicSolutionData | DetailedSolutionData | NarrativeSolutionData): data is DetailedSolutionData {
   return data && typeof data === 'object' && 'bruteForceCode' in data;
 }
 
-function isBasicSolution(data: BasicSolutionData | DetailedSolutionData | FourQuadrantData): data is BasicSolutionData {
+function isBasicSolution(data: BasicSolutionData | DetailedSolutionData | NarrativeSolutionData): data is BasicSolutionData {
   return data && typeof data === 'object' && 'thoughts' in data;
 }
 
-function isFourQuadrantData(data: BasicSolutionData | DetailedSolutionData | FourQuadrantData): data is FourQuadrantData {
-  return data && typeof data === 'object' && 'problemUnderstanding' in data;
+// NEW type guard for NarrativeSolutionData
+function isNarrativeSolutionData(data: BasicSolutionData | DetailedSolutionData | NarrativeSolutionData): data is NarrativeSolutionData {
+  return data && typeof data === 'object' && 'problemAnalysis' in data && 'optimalImplementation' in data;
 }
 
 describe('SolutionProcessor', () => {
@@ -62,17 +71,6 @@ describe('SolutionProcessor', () => {
   };
 
   const mockFourQuadrantApiResponse = 'Four quadrant API response';
-  const mockParsedFourQuadrant: FourQuadrantData = {
-    problemUnderstanding: 'Understood the problem well.',
-    bruteForceApproach: 'Try all pairs.',
-    optimalSolutionPseudocode: 'Use a hash map.',
-    optimalSolutionImplementation: {
-      code: 'optimal code here',
-      timeComplexity: 'O(n)',
-      spaceComplexity: 'O(n)',
-      thinkingProcess: 'Store seen numbers.'
-    }
-  };
 
   const mockAbortSignal = { aborted: false } as AbortSignal;
   const mockMainWindow: Partial<BrowserWindow> = {
@@ -80,6 +78,42 @@ describe('SolutionProcessor', () => {
       send: vi.fn()
     } as any
   };
+
+  // NEW Mock for NarrativeSolutionData response
+  const mockNarrativeApiResponse = 'Narrative API response';
+  const mockParsedNarrative: NarrativeSolutionData = {
+    problemAnalysis: 'Parsed problem analysis.',
+    bruteForce: {
+      explanation: 'Parsed brute force explanation.',
+      codeOrPseudocode: 'brute force code/pseudo',
+      timeComplexity: 'O(n^2)',
+      spaceComplexity: 'O(1)',
+      inefficiencyReason: 'Parsed inefficiency reason.'
+    },
+    optimizationStrategy: {
+      explanation: 'Parsed optimization strategy explanation.',
+      pseudocode: 'optimal pseudocode',
+      timeComplexity: 'O(n)',
+      spaceComplexity: 'O(n)'
+    },
+    optimalImplementation: {
+      code: 'parsed optimal code',
+      dryRun: 'parsed dry run'
+    }
+  };
+  
+  // Mock for the prompt function result
+  const mockNarrativePromptResult = {
+    promptText: 'narrative prompt text',
+    systemPrompt: 'narrative system prompt'
+  };
+
+  // Add dummy confirmed data for narrative test
+  const mockConfirmedUnderstanding = "The user confirmed this understanding.";
+  const mockConfirmedExamples: ProblemExample[] = [
+    { input: "test1", output: "out1" },
+    { input: "test2", output: "out2", explanation: "expl2" }
+  ];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -100,151 +134,96 @@ describe('SolutionProcessor', () => {
     vi.mocked(responseParser.parseOptimizedResponse)
       .mockReturnValue(mockParsedOptimized);
 
-    vi.mocked(responseParser.parseFourQuadrantResponse)
-      .mockReturnValue(mockParsedFourQuadrant);
+    // Default mock for the NEW narrative path
+    vi.mocked(getNarrativeSolutionPrompt).mockReturnValue(mockNarrativePromptResult);
+    vi.mocked(aiService.generateCompletion).mockResolvedValue(mockNarrativeApiResponse);
+    vi.mocked(responseParser.parseNarrativeResponse).mockReturnValue(mockParsedNarrative);
+
+    // Mock fallback prompt if needed for fallback test
+    vi.mocked(getFallbackPrompt).mockReturnValue({ promptText: 'fallback prompt', systemPrompt: 'fallback system' });
+    vi.mocked(responseParser.parseStandardSolutionResponse).mockReturnValue({ 
+      code: 'fallback code', thoughts: [], time_complexity: 'O(n)', space_complexity: 'O(1)' 
+    });
   });
 
   afterEach(() => {
     vi.resetAllMocks();
   });
 
-  it('should generate a complete solution with brute force and optimized approaches', async () => {
+  it('should generate a complete narrative solution', async () => {
     const result = await solutionProcessor.generateSolutions(
       mockProblemInfo,
       'javascript',
       mockMainWindow as BrowserWindow,
-      mockAbortSignal
+      mockAbortSignal,
+      mockConfirmedUnderstanding,
+      mockConfirmedExamples
     );
-
-    // Debug logging
-    console.log("SolutionProcessor.generateSolutions result:", result.data);
-
-    // Verify success
-    expect(result.success).toBe(true);
-    
-    // Verify API calls
-    expect(aiService.generateCompletion).toHaveBeenCalledTimes(2);
-    
-    // Check the data structure
-    const data = result.data;
-    expect(data).toBeDefined();
-    
-    // Use type guard to check the structure
-    if (data && isDetailedSolution(data)) {
-      console.log("Brute force dry run:", data.bruteForceDryRunVisualization ?? 'Not available');
-      console.log("Optimized dry run:", data.optimizedDryRunVisualization ?? 'Not available');
-      
-      // Assertions for DetailedSolutionData
-      expect(data).toHaveProperty('problemStatement', mockProblemInfo.problem_statement);
-      expect(data).toHaveProperty('bruteForceCode', mockParsedBruteForce.code);
-      expect(data).toHaveProperty('bruteForceTimeComplexity', mockParsedBruteForce.timeComplexity);
-      expect(data).toHaveProperty('bruteForceSpaceComplexity', mockParsedBruteForce.spaceComplexity);
-      expect(data).toHaveProperty('bruteForceComplexityRationale', mockParsedBruteForce.complexityRationale);
-      expect(data).toHaveProperty('bruteForceDryRunVisualization', mockParsedBruteForce.dryRunVisualization);
-      expect(data).toHaveProperty('optimizationAnalysis', mockParsedOptimized.optimizationAnalysis);
-      expect(data).toHaveProperty('optimizedCode', mockParsedOptimized.code);
-      expect(data).toHaveProperty('optimizedTimeComplexity', mockParsedOptimized.timeComplexity);
-      expect(data).toHaveProperty('optimizedSpaceComplexity', mockParsedOptimized.spaceComplexity);
-      expect(data).toHaveProperty('optimizedComplexityRationale', mockParsedOptimized.complexityRationale);
-      expect(data).toHaveProperty('optimizedDryRunVisualization', mockParsedOptimized.dryRunVisualization);
-    } else {
-      // Fail the test if the data structure is not as expected
-      expect(data).toBeUndefined(); // Or assert the structure should be DetailedSolutionData
-    }
-  });
-
-  it('should generate a complete four-quadrant solution', async () => {
-    const result = await solutionProcessor.generateSolutions(
-      mockProblemInfo,
-      'javascript',
-      mockMainWindow as BrowserWindow,
-      mockAbortSignal
-    );
-
-    // Debug logging
-    console.log("SolutionProcessor.generateSolutions result:", result.data);
 
     // Verify success
     expect(result.success).toBe(true);
 
-    // Verify API calls
-    expect(aiService.generateCompletion).toHaveBeenCalledTimes(1);
-    expect(responseParser.parseFourQuadrantResponse).toHaveBeenCalledWith(mockFourQuadrantApiResponse);
+    // Verify mocks were called correctly
+    expect(getNarrativeSolutionPrompt).toHaveBeenCalledWith(
+      'javascript', 
+      mockProblemInfo, 
+      mockConfirmedUnderstanding,
+      mockConfirmedExamples
+    );
+    expect(aiService.generateCompletion).toHaveBeenCalledWith(
+      mockNarrativePromptResult.promptText,
+      mockNarrativePromptResult.systemPrompt,
+      undefined,
+      mockAbortSignal
+    );
+    expect(responseParser.parseNarrativeResponse).toHaveBeenCalledWith(mockNarrativeApiResponse);
 
     // Check the data structure
     const data = result.data;
     expect(data).toBeDefined();
 
     // Use the NEW type guard
-    if (data && isFourQuadrantData(data)) {
-      console.log("Four Quadrant Data:", data);
-
-      // Assertions for FourQuadrantData
-      expect(data.problemUnderstanding).toBe(mockParsedFourQuadrant.problemUnderstanding);
-      expect(data.bruteForceApproach).toBe(mockParsedFourQuadrant.bruteForceApproach);
-      expect(data.optimalSolutionPseudocode).toBe(mockParsedFourQuadrant.optimalSolutionPseudocode);
-      expect(data.optimalSolutionImplementation.code).toBe(mockParsedFourQuadrant.optimalSolutionImplementation.code);
-      expect(data.optimalSolutionImplementation.timeComplexity).toBe(mockParsedFourQuadrant.optimalSolutionImplementation.timeComplexity);
-      expect(data.optimalSolutionImplementation.spaceComplexity).toBe(mockParsedFourQuadrant.optimalSolutionImplementation.spaceComplexity);
-      expect(data.optimalSolutionImplementation.thinkingProcess).toBe(mockParsedFourQuadrant.optimalSolutionImplementation.thinkingProcess);
+    if (data && isNarrativeSolutionData(data)) {
+      // Assertions for NarrativeSolutionData
+      expect(data.problemAnalysis).toBe(mockParsedNarrative.problemAnalysis);
+      expect(data.bruteForce.explanation).toBe(mockParsedNarrative.bruteForce.explanation);
+      expect(data.bruteForce.codeOrPseudocode).toBe(mockParsedNarrative.bruteForce.codeOrPseudocode);
+      // ... add assertions for all fields in NarrativeSolutionData
+      expect(data.optimalImplementation.code).toBe(mockParsedNarrative.optimalImplementation.code);
+      expect(data.optimalImplementation.dryRun).toBe(mockParsedNarrative.optimalImplementation.dryRun);
     } else {
-      // Fail the test if the data structure is not FourQuadrantData
-      console.error("Expected FourQuadrantData, but received:", data);
-      expect(data).toBeDefined();
-      expect(isFourQuadrantData(data)).toBe(true);
+      // Fail the test if the data structure is not NarrativeSolutionData
+      console.error("Expected NarrativeSolutionData, but received:", data); // Log error for debugging
+      expect(isNarrativeSolutionData(data)).toBe(true); // Add explicit assertion
     }
   });
 
-  it('should fallback to standard solution if multi-prompt approach fails', async () => {
-    // Set up mocks to simulate failure in the four-quadrant approach
+  it('should fallback to standard solution if narrative approach fails', async () => {
+    // Set up mocks to simulate failure in the narrative approach
+    vi.mocked(getNarrativeSolutionPrompt).mockReturnValue(mockNarrativePromptResult); // Still need prompt
     vi.mocked(aiService.generateCompletion)
-      .mockRejectedValueOnce(new Error('API Error'))
-      .mockResolvedValueOnce('Standard solution response');
-      
-    const mockStandardResponse: BasicSolutionData = {
-      code: 'standard code',
-      thoughts: ['thought 1', 'thought 2'],
-      time_complexity: 'O(n log n)',
-      space_complexity: 'O(n)',
-      dryRunVisualization: 'Standard solution dry run: Initialize numMap={}, i=0, num=2, complement=7, add to map, i=1, num=7, complement=2, found in map, return [0,1]'
-    };
-    vi.mocked(responseParser.parseStandardSolutionResponse)
-      .mockReturnValue(mockStandardResponse);
-    
+      .mockRejectedValueOnce(new Error('API Error')) // First call (narrative) fails
+      .mockResolvedValueOnce('Standard solution response'); // Second call (fallback) succeeds
+
+    // Rerun the generateSolutions call, now expecting fallback
     const result = await solutionProcessor.generateSolutions(
       mockProblemInfo,
       'javascript',
       mockMainWindow as BrowserWindow,
-      mockAbortSignal
+      mockAbortSignal,
+      mockConfirmedUnderstanding,
+      mockConfirmedExamples
     );
-    
-    // Debug logging
-    console.log("Fallback solution result:", result.data);
-    const data = result.data;
-    expect(data).toBeDefined();
 
-    // Use type guard to check the structure
-    if (data && isBasicSolution(data)) {
-      console.log("Fallback solution dry run:", data.dryRunVisualization ?? 'Not available');
-      
-      // Verify success despite initial failure
-      expect(result.success).toBe(true);
-      
-      // Verify fallback API call
-      expect(aiService.generateCompletion).toHaveBeenCalledTimes(2);
-      expect(responseParser.parseStandardSolutionResponse).toHaveBeenCalledTimes(1);
-      
-      // Assertions for BasicSolutionData
-      expect(data).toHaveProperty('code', mockStandardResponse.code);
-      expect(data).toHaveProperty('thoughts', mockStandardResponse.thoughts);
-      expect(data).toHaveProperty('time_complexity', mockStandardResponse.time_complexity);
-      expect(data).toHaveProperty('space_complexity', mockStandardResponse.space_complexity);
-      expect(data).toHaveProperty('dryRunVisualization', mockStandardResponse.dryRunVisualization);
-    } else {
-      // Fail the test if the data structure is not as expected
-      console.error("Expected BasicSolutionData after fallback, but received:", data);
-      expect(data).toBeDefined();
-      expect(isBasicSolution(data)).toBe(true);
-    }
+    expect(result.success).toBe(true); // Fallback should succeed
+    expect(getNarrativeSolutionPrompt).toHaveBeenCalledTimes(1); // Called once
+    expect(getFallbackPrompt).toHaveBeenCalledTimes(1); // Fallback prompt called
+    expect(aiService.generateCompletion).toHaveBeenCalledTimes(2); // Narrative failed, fallback called
+    expect(responseParser.parseNarrativeResponse).not.toHaveBeenCalled(); // Narrative parse not called
+    expect(responseParser.parseStandardSolutionResponse).toHaveBeenCalledTimes(1); // Fallback parse called
+
+    // Check data is basic solution
+    expect(isBasicSolution(result.data)).toBe(true);
+    expect(result.data).toHaveProperty('code', 'fallback code');
   });
 }); 

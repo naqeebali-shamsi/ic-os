@@ -4,8 +4,7 @@
  */
 
 // Import the shared definition
-import { ProblemInfo } from './electron/main'; // Adjust path if necessary
-import { ProblemExample } from './electron/ResponseParser'; // Import if needed
+import { ProblemInfo, ProblemExample } from './types'; // Import from new types file
 
 /**
  * Generates the brute force solution prompt - MODIFIED FOR JSON
@@ -367,12 +366,14 @@ Ensure the entire output is a single valid JSON object starting with { and endin
  */
 export function getBehavioralFollowUpPrompt(
   originalQuestion: string,
-  selectedStory: { title: string; situation: string; task: string; action: string; result: string }, // Pass relevant story fields
+  selectedStory: { id: string; title: string; principles: string[]; situation: string; task: string; action: string; result: string }, // Pass full story
   followUpQuestion: string
 ): { promptText: string; systemPrompt: string } {
 
   const storyContext = `
+Story ID: ${selectedStory.id}
 Title: ${selectedStory.title}
+Relevant LPs: ${selectedStory.principles.join(', ')}
 Situation: ${selectedStory.situation}
 Task: ${selectedStory.task}
 Action: ${selectedStory.action}
@@ -386,21 +387,272 @@ Previously Selected Story:
 ${storyContext}
 User Follow-up Question: "${followUpQuestion}"
 
-Task: Based on the context of the original question, the selected STAR story, and the user's follow-up question, provide a concise and helpful answer. Focus on addressing the specific follow-up question directly in relation to the story provided.
+Task: Provide a confident, natural, and subtly technical answer to the user's follow-up question. Base your answer directly on the details provided in the selected STAR story context.
 
-Respond ONLY with a JSON object containing a single key: \`explanation\`. The value should be a string containing your answer to the follow-up question.
+Instructions:
+1.  Carefully analyze the follow-up question in relation to the specific details (Situation, Task, Action, Result) of the provided story.
+2.  Formulate an answer that directly addresses the follow-up question.
+3.  Where relevant, subtly incorporate or reference the **quantitative impact/results** or **key lessons learned** mentioned in the story's 'Result' field or implied by the narrative.
+4.  Maintain a confident and natural tone, avoiding weak phrasing.
+5.  Respond ONLY with a JSON object containing a single key: \`explanation\`. The value should be a string containing your answer.
 
-Example JSON Output:
+Example JSON Output (Follow-up: "What was the biggest challenge?"):
 {
-  "explanation": "Regarding how my manager reacted, they were initially concerned but ultimately supportive after seeing the positive results and the proactive steps taken. They commended the initiative during my performance review."
+  "explanation": "The biggest challenge was definitely the tight deadline coupled with the unexpected complexity of the third-party API integration. We overcame it by prioritizing ruthlessly and implementing the temporary caching layer mentioned, which bought us the necessary time to address the core issue without delaying the launch. This reinforced the lesson about needing contingency plans, especially with external dependencies."
 }
 
 Your JSON Response:
 `;
 
-  const systemPrompt = `You are an AI assistant helping a user elaborate on their pre-written behavioral stories during an interview preparation context. Answer the user's follow-up question concisely and directly, based on the provided story. Respond strictly with a JSON object containing the key 'explanation'.`;
+  const systemPrompt = `You are an AI assistant helping a user elaborate on their pre-written behavioral stories during interview preparation. Answer the user's specific follow-up question confidently and directly, drawing ONLY from the provided STAR story context. Incorporate impact and lessons learned where relevant. Respond strictly with a JSON object containing the key 'explanation'.`;
 
   return { promptText: userPrompt, systemPrompt };
 }
 
-// --- Behavioral Question Prompts ---\n\n/**\n * Generates the prompt for extracting relevant LPs from a behavioral question.\n * Input: User question, list of LPs.\n * Output: JSON array of LP names, e.g., [\"Customer Obsession\", \"Ownership\"].\n */\nexport function getBehavioralLPExtractionPrompt(\n  userQuestion: string,\n  lps: Array<{ name: string; description: string }>\n): { promptText: string; systemPrompt: string } {\n  const lpList = lps.map(lp => `- ${lp.name}: ${lp.description}`).join(\'\\n\');\n\n  const userPrompt = `\nUser Behavioral Question: \"${userQuestion}\"\n\nAvailable Leadership Principles:\n${lpList}\n\nTask: Analyze the user\'s question and identify the primary Leadership Principle(s) being targeted or relevant to the question. Respond ONLY with a JSON array containing the exact names (strings) of the identified principle(s). If multiple principles are strongly relevant, include them. If none seem directly relevant, return an empty array [].\n\nExample Output:\n[\"Customer Obsession\", \"Deliver Results\"]\n\nYour JSON Response:\n`;\n\n  const systemPrompt = `You are an AI assistant specializing in behavioral interviews, particularly Amazon's Leadership Principles. Your task is to identify which LPs are relevant to a given interview question. Respond strictly with a JSON array of LP names.`;\n\n  return { promptText: userPrompt, systemPrompt };\n}\n\n/**\n * Generates the prompt for selecting the best user story based on the question and extracted LPs.\n * Input: User question, extracted LPs, list of user stories.\n * Output: JSON { \"selectedStoryId\": \"id_or_null\", \"reasoning\": \"why_selected_or_not\" }.\n */\nexport function getBehavioralStorySelectionPrompt(\n  userQuestion: string,\n  extractedLPs: string[],\n  stories: Array<{ id: string; title: string; principles: string[]; situation: string; task: string; action: string; result: string }>\n): { promptText: string; systemPrompt: string } {\n  const storiesSummary = stories.map(s => \n    `- ID: ${s.id}\\n  Title: ${s.title}\\n  Principles: ${s.principles.join(\', \')}\\n  Summary: ${s.situation.substring(0, 50)}... ${s.result.substring(0, 50)}...`\n  ).join(\'\\n\\n\');\n\n  const userPrompt = `\nUser Behavioral Question: \"${userQuestion}\"\n\nIdentified Relevant Leadership Principles: ${extractedLPs.join(\', \')}\n\nAvailable User Stories:\n${storiesSummary}\n\nTask: Analyze the user question, the identified relevant principles, and the available user stories. Select the ONE story (by its ID) that BEST answers the user's question AND strongly aligns with the identified principles. \n\nProvide your response ONLY as a JSON object with two keys:\n1.  \`selectedStoryId\`: The ID (string) of the best matching story, or \`null\` if no story is a good fit.\n2.  \`reasoning\`: A brief (1-2 sentence) explanation for your choice (why it fits) or why no story was selected.\n\nExample Output (Match Found):\n{ \"selectedStoryId\": \"story-001\", \"reasoning\": \"Story directly addresses failing project situations and aligns with Ownership principle.\" }\n\nExample Output (No Match):\n{ \"selectedStoryId\": null, \"reasoning\": \"No story adequately demonstrated the specific conflict resolution scenario asked in the question.\" }\n\nYour JSON Response:\n`;\n\n  const systemPrompt = `You are an AI assistant helping users select the best STAR story for a behavioral interview question based on relevance and associated Leadership Principles. Respond strictly with a JSON object containing 'selectedStoryId' (string or null) and 'reasoning' (string).`;\n\n  return { promptText: userPrompt, systemPrompt };\n}\n\n/**\n * Generates the prompt for generating a STAR story as a fallback.\n * Input: User question, extracted LPs (and optionally user context - TBD).\n * Output: JSON { \"generatedStoryText\": \"full_star_story_text\" }.\n */\nexport function getBehavioralStoryGenerationPrompt(\n  userQuestion: string,\n  extractedLPs: string[]\n  // Future: Add user context parameter (e.g., userContext: { role: string; achievements: string[] })\n): { promptText: string; systemPrompt: string } {\n\n  // Basic context placeholder - THIS NEEDS TO BE REPLACED WITH REAL CONTEXT\n  const placeholderContext = \"User is a software engineer with experience in web development and cloud services. Key achievement: Led a project migration.\";\n\n  const userPrompt = `\nUser Behavioral Question: \"${userQuestion}\"\n\nTarget Leadership Principles: ${extractedLPs.join(\', \')}\n\nUser Context: ${placeholderContext} // IMPORTANT: This is placeholder context.\n\nTask: Generate a plausible and compelling story formatted using the STAR method (Situation, Task, Action, Result) that effectively answers the user's question and demonstrates the target Leadership Principles. Make reasonable assumptions based on the user context.\n\nStructure your response ONLY as a JSON object with a single key: \`generatedStoryText\`.\nThe value should be a single string containing the full story, formatted clearly with STAR headings (e.g., \"**Situation:** ... \\n**Task:** ... \\n**Action:** ... \\n**Result:** ...\").\n\nExample JSON Output:\n{ \"generatedStoryText\": \"**Situation:** In my previous role as a Software Engineer, we faced a critical performance issue with our main application... \\n**Task:** I was tasked with identifying the root cause... \\n**Action:** I initiated a deep dive analysis... \\n**Result:** This led to a 30% improvement in response time...\" }\n\nYour JSON Response:\n`;\n\n  const systemPrompt = `You are an AI assistant skilled at crafting compelling STAR-formatted behavioral stories based on a question, target Leadership Principles, and user context. Respond strictly with a JSON object containing the key 'generatedStoryText' with the full STAR story as its value.`;\n\n  return { promptText: userPrompt, systemPrompt };\n}\n 
+// --- Behavioral Question Prompts ---
+
+/**
+ * Generates the prompt for extracting relevant LPs from a behavioral question.
+ * Input: User question, list of LPs.
+ * Output: JSON array of LP names, e.g., ["Customer Obsession", "Ownership"].
+ */
+export function getBehavioralLPExtractionPrompt(
+  userQuestion: string,
+  lps: Array<{ name: string; description: string }>
+): { promptText: string; systemPrompt: string } {
+  const lpList = lps.map(lp => `- ${lp.name}: ${lp.description}`).join('\n');
+
+  const userPrompt = `
+User Behavioral Question: "${userQuestion}"
+
+Available Leadership Principles:
+${lpList}
+
+Task: Analyze the user's question and identify the primary Leadership Principle(s) being targeted or relevant to the question. Respond ONLY with a JSON array containing the exact names (strings) of the identified principle(s). If multiple principles are strongly relevant, include them. If none seem directly relevant, return an empty array [].
+
+Example Output:
+["Customer Obsession", "Deliver Results"]
+
+Your JSON Response:
+`;
+
+  const systemPrompt = `You are an AI assistant specializing in behavioral interviews, particularly Amazon's Leadership Principles. Your task is to identify which LPs are relevant to a given interview question. Respond strictly with a JSON array of LP names.`;
+
+  return { promptText: userPrompt, systemPrompt };
+}
+
+/**
+ * Generates the prompt for selecting the best user story based on the question and extracted LPs.
+ * Input: User question, extracted LPs, list of user stories.
+ * Output: JSON { "selectedStoryId": "id_or_null", "reasoning": "why_selected_or_not" }.
+ */
+export function getBehavioralStorySelectionPrompt(
+  userQuestion: string,
+  extractedLPs: string[],
+  stories: Array<{ id: string; title: string; principles: string[]; situation: string; task: string; action: string; result: string }>
+): { promptText: string; systemPrompt: string } {
+
+  const storiesFormatted = stories.map(s =>
+    `Story ID: ${s.id}\\nTitle: ${s.title}\\nRelevant LPs: ${s.principles.join(', ')}\\nSituation: ${s.situation}\\nTask: ${s.task}\\nAction: ${s.action}\\nResult: ${s.result}`
+  ).join('\\n\\n---\\n\\n');
+
+  const userPrompt = `
+Task: Select the *single best* behavioral story from the list below that answers the user's question, considering the relevant Leadership Principles (LPs). Then, provide a detailed reasoning for the selection.
+
+User Question: ${userQuestion}
+
+Extracted Relevant LPs: ${extractedLPs.join(', ')}
+
+Available Stories:
+${storiesFormatted}
+
+Instructions:
+1.  Analyze the User Question and the Extracted LPs.
+2.  Review each Available Story, paying attention to its Situation, Task, Action, Result (STAR), and tagged LPs.
+3.  Determine which *single story* is the most relevant and effective answer to the user's question, aligning with the LPs.
+4.  Respond ONLY with a valid JSON object containing:
+    *   \`selectedStoryId\`: The ID (string or number) of the chosen story, or \`null\` if no story is a good fit.
+    *   \`reasoning\`: A detailed explanation (string) formatted in a confident, natural, and subtly technical tone. This reasoning MUST include:
+        *   A clear statement of *why* this story directly answers the user's question and aligns with the specified LPs.
+        *   A concise summary of the story's STAR components (Situation, Task, Action, Result).
+        *   Explicit mention of the **quantitative impact** or key results (drawn from the story's 'Result' field). If no quantitative data is present, state the qualitative outcome clearly.
+        *   A summary of the **key lessons learned** or takeaways from the experience, ideally framed using relevant LPs (derived from the 'Result' or overall story context).
+        *   Avoid weak phrasing; use strong verbs and active voice.
+
+Example JSON Output (Success):
+\`\`\`json
+{
+  "selectedStoryId": "story_003",
+  "reasoning": "This story directly addresses the user's question about handling project failures and demonstrates 'Ownership' and 'Learn and Be Curious'. \\n\\n**STAR Summary:**\\n*   **Situation:** Faced unexpected integration issues with a third-party API during a critical deployment phase.\\n*   **Task:** Needed to identify the root cause and implement a fix under a tight deadline.\\n*   **Action:** Led a deep-dive debugging session, collaborated with the API provider, and implemented a workaround involving a temporary caching layer.\\n*   **Result:** Successfully mitigated the deployment blocker, resulting in a 90% reduction in integration errors and delivering the project on schedule.\\n\\n**Impact & Lessons:** The primary impact was preventing a major project delay and significantly improving integration stability (90% error reduction). Key takeaways include the importance of proactive vendor communication ('Earn Trust') and the value of exploring creative workarounds ('Invent and Simplify') when standard solutions fail. This experience reinforced my commitment to taking full ownership of problems, even external ones."
+}
+\`\`\`
+
+Example JSON Output (No Match):
+\`\`\`json
+{
+  "selectedStoryId": null,
+  "reasoning": "None of the provided stories effectively demonstrate the 'Think Big' principle in the context of the user's question about long-term strategic planning. The available stories focus more on tactical execution or resolving immediate issues."
+}
+\`\`\`
+
+Final Output Rules:
+- Respond ONLY with the specified JSON object.
+- The \`reasoning\` field must be detailed and structured as described above.
+- Do not include any introductory text or markdown formatting *outside* the JSON string values.
+`;
+
+  const systemPrompt = `You are an AI assistant helping users prepare for behavioral interviews, specifically for roles requiring strong communication and adherence to principles like Amazon's LPs. Your task is to select the single best pre-written STAR story from a list that answers a given behavioral question and aligns with specified principles. You must then generate a detailed, confident reasoning for your choice, summarizing STAR, highlighting impact, and detailing lessons learned, all within the specified JSON format.`;
+
+  return { promptText: userPrompt, systemPrompt };
+}
+
+/**
+ * Generates the prompt for generating a STAR story as a fallback.
+ * Input: User question, extracted LPs (and optionally user context - TBD).
+ * Output: JSON { "generatedStoryText": "full_star_story_text" }.
+ */
+export function getBehavioralStoryGenerationPrompt(
+  userQuestion: string,
+  extractedLPs: string[]
+  // Future: Add user context parameter (e.g., userContext: { role: string; achievements: string[] })
+): { promptText: string; systemPrompt: string } {
+
+  // Basic context placeholder - THIS NEEDS TO BE REPLACED WITH REAL CONTEXT
+  const placeholderContext = "User is a software engineer with experience in web development and cloud services. Key achievement: Led a project migration.";
+
+  const userPrompt = `
+User Behavioral Question: "${userQuestion}"
+
+Target Leadership Principles: ${extractedLPs.join(', ')}
+
+User Context: ${placeholderContext} // IMPORTANT: This is placeholder context.
+
+Task: Generate a plausible and compelling story formatted using the STAR method (Situation, Task, Action, Result) that effectively answers the user's question and demonstrates the target Leadership Principles. Make reasonable assumptions based on the user context.
+
+Structure your response ONLY as a JSON object with a single key: \`generatedStoryText\`.
+The value should be a single string containing the full story, formatted clearly with STAR headings (e.g., "**Situation:** ... \n**Task:** ... \n**Action:** ... \n**Result:** ...").
+
+Example JSON Output:
+{ "generatedStoryText": "**Situation:** In my previous role as a Software Engineer, we faced a critical performance issue with our main application... \n**Task:** I was tasked with identifying the root cause... \n**Action:** I initiated a deep dive analysis... \n**Result:** This led to a 30% improvement in response time..." }
+
+Your JSON Response:
+`;
+
+  const systemPrompt = `You are an AI assistant skilled at crafting compelling STAR-formatted behavioral stories based on a question, target Leadership Principles, and user context. Respond strictly with a JSON object containing the key 'generatedStoryText' with the full STAR story as its value.`;
+
+  return { promptText: userPrompt, systemPrompt };
+}
+
+/**
+ * Generates the prompt for anticipating likely follow-up questions for a behavioral story.
+ * Input: Original question, selected story.
+ * Output: JSON array [{ question: string, answer: string }].
+ */
+export function getAnticipatedBehavioralFollowUpsPrompt(
+  originalQuestion: string,
+  selectedStory: { id: string; title: string; principles: string[]; situation: string; task: string; action: string; result: string } // Pass full story
+): { promptText: string; systemPrompt: string } {
+
+  const storyContext = `
+Story ID: ${selectedStory.id}
+Title: ${selectedStory.title}
+Relevant LPs: ${selectedStory.principles.join(', ')}
+Situation: ${selectedStory.situation}
+Task: ${selectedStory.task}
+Action: ${selectedStory.action}
+Result: ${selectedStory.result}
+`;
+
+  const userPrompt = `
+Context:
+Original Behavioral Question: "${originalQuestion}"
+Selected STAR Story Provided by User:
+${storyContext}
+
+Task: Based *only* on the provided STAR story, anticipate 3-5 likely follow-up questions an interviewer might ask. Focus on questions that probe deeper into:
+*   Specific technical details mentioned or implied in the 'Action'.
+*   Challenges encountered during the 'Task' or 'Action'.
+*   Specific outcomes or quantitative results mentioned in the 'Result'.
+*   Alternative approaches considered.
+*   Key lessons learned or how the experience changed your approach (related to the 'Result').
+
+For each anticipated question, provide a concise, confident, and direct answer drawn strictly from the provided story details. Maintain a natural, subtly technical tone.
+
+Respond ONLY with a single, valid JSON array where each element is an object containing two keys: \`question\` (string) and \`answer\` (string).
+
+Example JSON Output:
+[
+  {
+    "question": "You mentioned collaborating with the API provider; what was the main point of friction there?",
+    "answer": "The main friction point was aligning on the urgency. Initially, the provider didn't view the integration error as critical on their end. I addressed this by clearly presenting the data showing the direct impact on our deployment timeline and user experience, which helped escalate the issue and secure their cooperation."
+  },
+  {
+    "question": "What was the performance impact of the temporary caching layer you implemented?",
+    "answer": "The caching layer immediately reduced the integration error rate by about 90%, effectively unblocking the deployment. While it added a small amount of latency (around 50ms), this was acceptable short-term compared to the complete failure we were experiencing."
+  },
+  {
+    "question": "Were there other workarounds you considered before settling on the caching layer?",
+    "answer": "Yes, we briefly considered rate-limiting calls or implementing a more complex retry mechanism with exponential backoff. However, given the tight deadline, the caching layer offered the fastest path to stability while we worked with the vendor on a permanent fix."
+  }
+]
+
+Your JSON Response:
+`;
+
+  const systemPrompt = `You are an AI assistant simulating a behavioral interview scenario. Based on a user's provided STAR story and the original question it answered, anticipate 3-5 likely follow-up questions an interviewer might ask, probing for more detail. Provide concise, confident answers to these anticipated questions, drawing ONLY from the story's content. Respond strictly with a JSON array of {question, answer} objects.`;
+
+  return { promptText: userPrompt, systemPrompt };
+}
+
+export function getBehavioralStoryDetailPrompt(story: {
+  id: string;
+  title: string;
+  principles: string[];
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+}): string {
+  const storyJson = JSON.stringify(story, null, 2); // Pretty print the JSON for the prompt
+
+  return `
+**Role:** Act as an expert career coach preparing a candidate for behavioral interviews, specifically focusing on Amazon's Leadership Principles (LPs).
+
+**Context:** You are given a concise story outline in the STAR (Situation, Task, Action, Result) format, along with associated LPs. Your goal is to expand this into a rich, detailed narrative **written in the first person ("I" statements)** from the candidate's perspective, which they can use for deep preparation.
+
+**Input Story Outline:**
+\`\`\`json
+${storyJson}
+\`\`\`
+
+**Instructions:**
+
+Expand the provided story outline into a detailed narrative suitable for a behavioral interview, **written entirely from the first-person perspective ("I")**. Ensure the narrative covers the following aspects in depth:
+
+1.  **Detailed Situation:**
+    *   Go beyond the summary. What was the broader context *I* faced?
+    *   Why was this situation important or challenging for *me* or *my* team?
+    *   What were the key constraints (time, resources, technical limitations) *I* operated under?
+2.  **Specific Task:**
+    *   Clearly define *my* specific responsibilities within the overall task.
+    *   What was the primary objective *I* needed to achieve?
+3.  **In-Depth Action:**
+    *   Describe the steps *I* took in detail. What was *my* thought process?
+    *   What specific decisions did *I* make? Why?
+    *   Mention key technical details, tools, or methodologies *I* used.
+    *   What were the main challenges or obstacles *I* encountered? How did *I* overcome them?
+    *   **Collaboration:** If others were involved, clearly state their roles and how *I* collaborated or interacted with them. Define *my* unique contribution.
+4.  **Expanded Result:**
+    *   Elaborate on the stated result. *How* were the metrics measured or estimated? Provide specifics if possible.
+    *   If quantifiable results aren't available, describe the qualitative impact *I* observed in detail (e.g., improved team morale, enhanced process efficiency, positive user feedback).
+    *   What was the significance of this result for the team, project, or company, from *my* perspective?
+5.  **Lessons Learned & LP Connection:**
+    *   Concisely summarize 2-3 key takeaways *I* gained from this experience.
+    *   Explicitly connect these takeaways to the listed Leadership Principles (${'`' + story.principles.join('`, `') + '`'}). For example: "This experience taught *me* the importance of [LP Name], specifically when *I* had to [brief action related to the LP]."
+    *   Make these takeaways strong and memorable, easy for an interviewer to note down.
+
+**Output Format:**
+
+Present the expanded story in a clear, readable format using Markdown sections (\`### Situation\`, \`### Task\`, \`### Action\`, \`### Result\`, \`### Lessons Learned\`). Ensure the narrative flows well, feels authentic, and **uses the first person ("I") throughout.**
+`;
+}
